@@ -227,8 +227,31 @@ var DB = {
 DB.init();
 
 /* ========================= Data Accessors ========================= */
-function getTherapist(){return LS.get('therapist_info')||{name:'',department:''}}
-function setTherapist(t){LS.set('therapist_info',t)}
+function getProfiles(){return LS.get('therapist_profiles')||[]}
+function setProfiles(p){LS.set('therapist_profiles',p)}
+function getActiveProfileId(){return LS.get('active_profile_id')||''}
+function setActiveProfileId(id){LS.set('active_profile_id',id)}
+function getActiveProfile(){
+  var profiles=getProfiles();
+  if(profiles.length===0)return null;
+  var aid=getActiveProfileId();
+  if(!aid)return profiles[0];
+  for(var i=0;i<profiles.length;i++){if(profiles[i].id===aid)return profiles[i]}
+  return profiles[0];
+}
+function getTherapist(){var p=getActiveProfile();return p||{name:'',department:'',role:''}}
+function setTherapist(t){
+  // 兼容旧代码，保存为第一个profile
+  var profiles=getProfiles();
+  if(profiles.length===0){
+    profiles=[{id:uid(),name:t.name,department:t.department,role:''}];
+    setProfiles(profiles);
+    setActiveProfileId(profiles[0].id);
+  }else{
+    profiles[0].name=t.name;profiles[0].department=t.department;
+    setProfiles(profiles);
+  }
+}
 function getPatients(){return LS.get('patients')||[]}
 function setPatients(p){LS.set('patients',p)}
 function getRecords(){return LS.get('records')||[]}
@@ -243,6 +266,17 @@ function pad(n){return n<10?'0'+n:''+n}
 function fmtTime(ts){
   var d=new Date(ts);
   return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+}
+function roundToHalfHour(ts){
+  var d=new Date(ts);
+  var m=d.getMinutes();
+  d.setMinutes(m<30?0:30);
+  d.setSeconds(0);
+  return d.getTime();
+}
+function fmtTimeShort(ts){
+  var d=new Date(ts);
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes());
 }
 function fmtDate(ts){
   var d=new Date(ts);
@@ -352,16 +386,25 @@ function addWatermark(imgURL,data,cb){
     ctx.drawImage(img,0,0,canvas.width,canvas.height);
 
     var barH=Math.max(120,Math.round(canvas.height*0.18));
-    // gradient bar
-    var grad=ctx.createLinearGradient(0,canvas.height-barH,0,canvas.height);
-    grad.addColorStop(0,'rgba(0,0,0,0.55)');
-    grad.addColorStop(1,'rgba(0,0,0,0.78)');
-    ctx.fillStyle=grad;
+    // frosted glass effect: capture bottom region into temp canvas, blur, then redraw
+    var tmp=document.createElement('canvas');
+    tmp.width=canvas.width;
+    tmp.height=barH;
+    var tctx=tmp.getContext('2d');
+    tctx.drawImage(canvas,0,canvas.height-barH,canvas.width,barH,0,0,canvas.width,barH);
+    ctx.filter='blur(8px)';
+    ctx.drawImage(tmp,0,canvas.height-barH);
+    ctx.filter='none';
+    // overlay semi-transparent white
+    ctx.fillStyle='rgba(255,255,255,0.12)';
     ctx.fillRect(0,canvas.height-barH,canvas.width,barH);
+    // top frosted edge line
+    ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.fillRect(0,canvas.height-barH,canvas.width,1.5);
 
     var pad=Math.round(canvas.width*0.03);
     var fontSize=Math.max(16,Math.round(barH/7.5));
-    ctx.fillStyle='#fff';
+    ctx.fillStyle='rgba(255,255,255,0.95)';
     ctx.font='600 '+fontSize+'px sans-serif';
     ctx.textBaseline='top';
     var lineH=Math.round(fontSize*1.35);
@@ -457,6 +500,7 @@ var app=document.getElementById('app');
 
 routes['/home']=function(){
   var t=getTherapist();
+  var profiles=getProfiles();
   var patients=getPatients();
   var records=getRecords();
   var today=todayStr();
@@ -481,9 +525,11 @@ routes['/home']=function(){
     rrHtml+='<div class="record-card" data-rid="'+r.id+'"><div class="record-info"><div class="rn">'+escapeHtml(r.recordNo)+'</div><div class="rm">'+escapeHtml(r.patientName)+' · '+escapeHtml(r.treatmentType)+'</div><div class="rt">'+fmtTime(r.timestamp)+'</div></div></div>';
   })}
 
+  var identitySub=(t.department?escapeHtml(t.department):'未设置科室')+(t.role?' · '+escapeHtml(t.role):'')+(profiles.length>1?' · 共'+profiles.length+'个身份 ›':' ›');
+
   app.innerHTML=
     '<div class="page">'+
-    '<div class="page-header" data-go="/settings"><h2>'+(t.name?escapeHtml(t.name):'点击设置姓名')+'</h2><p>'+(t.department?escapeHtml(t.department):'未设置科室')+' ›</p></div>'+
+    '<div class="page-header" id="home_header"><h2>'+(t.name?escapeHtml(t.name):'点击设置姓名')+'</h2><p>'+identitySub+'</p></div>'+
     '<div class="stat-grid"><div class="stat-box"><div class="num">'+todayCount+'</div><div class="lbl">今日记录</div></div><div class="stat-box"><div class="num">'+records.length+'</div><div class="lbl">累计记录</div></div><div class="stat-box"><div class="num">'+patients.length+'</div><div class="lbl">患者总数</div></div></div>'+
     '<div class="card"><div class="card-title">快速拍照 <span class="more" data-go="/camera">更多 ›</span></div><div class="type-grid">'+typeGridHtml+'</div></div>'+
     '<div class="card"><div class="card-title">最近患者</div>'+rpHtml+'</div>'+
@@ -493,8 +539,12 @@ routes['/home']=function(){
   // bind type grid
   var tg=document.querySelectorAll('.type-item');
   for(var i=0;i<tg.length;i++){(function(el){el.onclick=function(){go('/camera?type='+encodeURIComponent(el.getAttribute('data-type')))}})(tg[i])}
-  // bind header to settings
-  var hdr=document.querySelector('.page-header');if(hdr)hdr.onclick=function(){go('/settings')};
+  // bind header to switch identity (or go to settings if no profiles)
+  var hdr=document.querySelector('.page-header');
+  if(hdr)hdr.onclick=function(){
+    if(profiles.length===0){go('/settings');return}
+    showProfileSwitcher();
+  };
   // patient cam
   var pc=document.querySelectorAll('[data-cam]');
   for(var j=0;j<pc.length;j++){(function(el){el.onclick=function(e){e.stopPropagation();go('/camera?pid='+el.getAttribute('data-cam'))}})(pc[j])}
@@ -502,6 +552,37 @@ routes['/home']=function(){
   var rcr=document.querySelectorAll('[data-rid]');
   for(var k=0;k<rcr.length;k++){(function(el){el.onclick=function(){go('/record/'+el.getAttribute('data-rid'))}})(rcr[k])}
 };
+
+/* profile switcher modal (used on home header click) */
+function showProfileSwitcher(){
+  var profiles=getProfiles();
+  var aid=getActiveProfileId();
+  if(profiles.length===0){go('/settings');return}
+  var mask=document.createElement('div');
+  mask.className='modal-mask';
+  var listHtml='';
+  profiles.forEach(function(p){
+    var on=p.id===aid;
+    listHtml+='<div class="list-link" data-pid="'+p.id+'" style="cursor:pointer;'+(on?'border-color:var(--primary);background:#ebf8ff':'')+'">'+
+      '<div><div style="font-weight:600">'+escapeHtml(p.name||'(未命名)')+'</div>'+
+      '<div style="font-size:12px;color:#888">'+escapeHtml(p.department||'未设置科室')+(p.role?' · '+escapeHtml(p.role):'')+'</div></div>'+
+      '<span class="link-arrow">'+(on?'✓ 当前':'切换')+'</span></div>';
+  });
+  mask.innerHTML='<div class="modal"><div class="modal-hd"><span>切换身份</span><span class="close">&times;</span></div>'+
+    '<div class="modal-bd">'+listHtml+
+    '<button class="btn btn-ghost" id="sp_manage" style="margin-top:10px">⚙ 前往身份管理</button></div></div>';
+  document.body.appendChild(mask);
+  mask.querySelector('.close').onclick=function(){mask.remove()};
+  mask.onclick=function(e){if(e.target===mask)mask.remove()};
+  mask.querySelector('#sp_manage').onclick=function(){mask.remove();go('/settings')};
+  var items=mask.querySelectorAll('[data-pid]');
+  for(var i=0;i<items.length;i++){(function(el){
+    el.onclick=function(){
+      setActiveProfileId(el.getAttribute('data-pid'));
+      mask.remove();toast('已切换身份');route('/home');
+    };
+  })(items[i])}
+}
 
 routes['/patients']=function(){
   var patients=getPatients();
@@ -572,6 +653,8 @@ routes['/camera']=function(param,query){
     var b=document.querySelector('[data-go="/patients"]');if(b)b.onclick=function(){go('/patients')};
     return;
   }
+  var profiles=getProfiles();
+  var activeProfile=getActiveProfile()||profiles[0]||{id:'',name:t.name,department:t.department,role:t.role};
   var presetType=query.type||TREATMENT_TYPES[0];
   var presetPid=query.pid||'';
 
@@ -579,67 +662,143 @@ routes['/camera']=function(param,query){
   patients.forEach(function(p){opts+='<option value="'+p.id+'"'+(p.id===presetPid?' selected':'')+'>'+escapeHtml(p.name)+'</option>'});
   var topts='';
   TREATMENT_TYPES.forEach(function(tp){topts+='<option value="'+tp+'"'+(tp===presetType?' selected':'')+'>'+tp+'</option>'});
+  var idopts='';
+  if(profiles.length===0){
+    idopts='<option value="">'+escapeHtml(t.name||'(未设置)')+'</option>';
+  }else{
+    profiles.forEach(function(p){idopts+='<option value="'+p.id+'"'+(p.id===activeProfile.id?' selected':'')+'>'+escapeHtml(p.name||'(未命名)')+(p.department?' · '+escapeHtml(p.department):'')+'</option>'});
+  }
+
+  // default time rounded to half hour
+  var nowTs=roundToHalfHour(Date.now());
+  var dval=new Date(nowTs);
+  var dvalStr=dval.getFullYear()+'-'+pad(dval.getMonth()+1)+'-'+pad(dval.getDate())+'T'+pad(dval.getHours())+':'+pad(dval.getMinutes());
 
   app.innerHTML='<div class="page"><div class="page-header"><h2>拍照记录</h2><p>拍摄治疗过程并自动加水印</p></div>'+
     '<div class="card">'+
+    '<div class="form-group"><label>当前身份</label><select id="cam_identity" '+(profiles.length===0?'disabled':'')+'>'+idopts+'</select></div>'+
     '<div class="form-group"><label>选择患者</label><select id="cam_pid">'+opts+'</select></div>'+
     '<div class="form-group"><label>治疗类型</label><select id="cam_type">'+topts+'</select></div>'+
     '<div class="form-group"><label>地点</label><input id="cam_loc" value="" placeholder="如：3楼康复科治疗室"></div>'+
-    '<div class="form-group"><label>治疗师</label><input id="cam_th" value="'+escapeHtml(t.name)+'" placeholder="治疗师姓名" '+(t.name?'':'')+'></div>'+
+    '<div class="form-group"><label>治疗师姓名</label><input id="cam_th" value="'+escapeHtml(t.name)+'" placeholder="治疗师姓名"></div>'+
+    '<div class="form-group"><label>治疗时间</label><input type="datetime-local" id="cam_time" value="'+dvalStr+'"></div>'+
     '<button class="btn" id="cam_shoot">📷 拍照</button>'+
     '<input type="file" id="cam_file" accept="image/*" capture="environment" style="display:none">'+
     '</div>'+
     '<div class="card" id="cam_preview_wrap" style="display:none">'+
     '<div class="card-title">预览（已加水印）</div>'+
     '<img class="photo-preview" id="cam_preview_img">'+
-    '<button class="btn" id="cam_save">💾 保存记录</button>'+
+    '<div style="display:flex;gap:8px">'+
+    '<button class="btn" id="cam_save" style="flex:1">💾 保存记录</button>'+
+    '<button class="btn btn-ghost" id="cam_update" style="flex:1">🔄 更新水印</button>'+
+    '</div>'+
     '<button class="btn btn-ghost" id="cam_reshoot" style="margin-top:8px">重新拍摄</button>'+
     '</div></div>';
 
   var fileInput=document.getElementById('cam_file');
+
+  // identity change -> update therapist name input
+  var idSel=document.getElementById('cam_identity');
+  if(idSel){
+    idSel.onchange=function(){
+      var pid=this.value;
+      var ps=getProfiles();
+      for(var i=0;i<ps.length;i++){if(ps[i].id===pid){
+        document.getElementById('cam_th').value=ps[i].name||'';
+        break;
+      }}
+    };
+  }
+
+  // read current form values
+  function readForm(){
+    var pid=document.getElementById('cam_pid').value;
+    var pname='';
+    var ps=getPatients();
+    for(var i=0;i<ps.length;i++){if(ps[i].id===pid){pname=ps[i].name;break}}
+    var type=document.getElementById('cam_type').value;
+    var loc=document.getElementById('cam_loc').value.trim()||'未填写';
+    var th=document.getElementById('cam_th').value.trim()||'未填写';
+    var tval=document.getElementById('cam_time').value;
+    var ts;
+    if(tval){
+      var dd=new Date(tval);
+      ts=isNaN(dd.getTime())?roundToHalfHour(Date.now()):dd.getTime();
+    }else{
+      ts=roundToHalfHour(Date.now());
+    }
+    var rno=genRecordNo(ts);
+    return {pid:pid,pname:pname,type:type,loc:loc,th:th,ts:ts,rno:rno};
+  }
+
+  // encapsulated capture + watermark function (reusable for "update watermark")
+  function captureAndWatermark(file){
+    if(!file){toast('请先拍照');return}
+    var fr=new FileReader();
+    fr.onload=function(){
+      var f=readForm();
+      toast('正在生成水印...');
+      addWatermark(fr.result,{
+        datetime:fmtTimeShort(f.ts),location:f.loc,therapist:f.th,patient:f.pname,type:f.type,recordNo:f.rno
+      },function(blob,dataURL){
+        pendingCapture={blob:blob,dataURL:dataURL,file:file,imgURL:fr.result,pid:f.pid,pname:f.pname,type:f.type,loc:f.loc,th:f.th,ts:f.ts,rno:f.rno};
+        var prevImg=document.getElementById('cam_preview_img');
+        if(prevImg)prevImg.src=dataURL;
+        var wrap=document.getElementById('cam_preview_wrap');
+        if(wrap)wrap.style.display='block';
+        toast('水印已生成');
+      });
+    };
+    fr.readAsDataURL(file);
+  }
+
   document.getElementById('cam_shoot').onclick=function(){fileInput.click()};
   document.getElementById('cam_reshoot').onclick=function(){fileInput.click()};
   fileInput.onchange=function(e){
     var file=e.target.files[0];
     if(!file)return;
-    var fr=new FileReader();
-    fr.onload=function(){
-      var pid=document.getElementById('cam_pid').value;
-      var pname='';
-      var ps=getPatients();
-      for(var i=0;i<ps.length;i++){if(ps[i].id===pid){pname=ps[i].name;break}}
-      var type=document.getElementById('cam_type').value;
-      var loc=document.getElementById('cam_loc').value.trim()||'未填写';
-      var th=document.getElementById('cam_th').value.trim()||'未填写';
-      var now=Date.now();
-      var rno=genRecordNo(now);
-      toast('正在生成水印...');
-      addWatermark(fr.result,{
-        datetime:fmtTime(now),location:loc,therapist:th,patient:pname,type:type,recordNo:rno
-      },function(blob,dataURL){
-        pendingCapture={blob:blob,dataURL:dataURL,pid:pid,pname:pname,type:type,loc:loc,th:th,ts:now,rno:rno};
-        document.getElementById('cam_preview_img').src=dataURL;
-        document.getElementById('cam_preview_wrap').style.display='block';
-        toast('水印已生成');
-      });
-    };
-    fr.readAsDataURL(file);
+    captureAndWatermark(file);
     fileInput.value=''; // allow re-pick same file
+  };
+  document.getElementById('cam_update').onclick=function(){
+    if(!pendingCapture||!pendingCapture.file){toast('请先拍照');return}
+    captureAndWatermark(pendingCapture.file);
   };
   document.getElementById('cam_save').onclick=function(){
     if(!pendingCapture){toast('请先拍照');return}
-    var c=pendingCapture;
-    var rec={id:uid(),recordNo:c.rno,patientId:c.pid,patientName:c.pname,therapistName:c.th,treatmentType:c.type,location:c.loc,timestamp:c.ts,photoId:null};
-    // save blob to idb with id=rec.id
-    DB.putPhoto(rec.id,c.blob).then(function(){
-      rec.photoId=rec.id;
-      var rs=getRecords();
-      rs.push(rec);
-      setRecords(rs);
-      pendingCapture=null;
-      toast('已保存记录');
-      go('/record/'+rec.id);
-    }).catch(function(err){toast('保存失败：'+(err&&err.message||''));});
+    // auto-update watermark if form changed before save
+    var f=readForm();
+    var needUpdate=(f.pid!==pendingCapture.pid||f.pname!==pendingCapture.pname||f.type!==pendingCapture.type||
+                    f.loc!==pendingCapture.loc||f.th!==pendingCapture.th||f.ts!==pendingCapture.ts||f.rno!==pendingCapture.rno);
+    var doSave=function(){
+      var c=pendingCapture;
+      var rec={id:uid(),recordNo:c.rno,patientId:c.pid,patientName:c.pname,therapistName:c.th,treatmentType:c.type,location:c.loc,timestamp:c.ts,photoId:null};
+      // save blob to idb with id=rec.id
+      DB.putPhoto(rec.id,c.blob).then(function(){
+        rec.photoId=rec.id;
+        var rs=getRecords();
+        rs.push(rec);
+        setRecords(rs);
+        pendingCapture=null;
+        toast('已保存记录');
+        go('/record/'+rec.id);
+      }).catch(function(err){toast('保存失败：'+(err&&err.message||''));});
+    };
+    if(needUpdate&&pendingCapture.file){
+      // regenerate then save
+      var fr=new FileReader();
+      fr.onload=function(){
+        addWatermark(fr.result,{
+          datetime:fmtTimeShort(f.ts),location:f.loc,therapist:f.th,patient:f.pname,type:f.type,recordNo:f.rno
+        },function(blob,dataURL){
+          pendingCapture={blob:blob,dataURL:dataURL,file:pendingCapture.file,imgURL:fr.result,pid:f.pid,pname:f.pname,type:f.type,loc:f.loc,th:f.th,ts:f.ts,rno:f.rno};
+          doSave();
+        });
+      };
+      fr.readAsDataURL(pendingCapture.file);
+    }else{
+      doSave();
+    }
   };
 };
 
@@ -813,32 +972,130 @@ routes['/stats']=function(){
 /* ---- Settings ---- */
 routes['/settings']=function(){
   var t=getTherapist();
-  app.innerHTML='<div class="page"><div class="page-header"><h2>设置</h2><p>治疗师信息与数据管理</p></div>'+
-    '<div class="card"><div class="card-title">治疗师信息</div>'+
+  var profiles=getProfiles();
+  var aid=getActiveProfileId();
+  // build identity cards html
+  var idListHtml='';
+  if(profiles.length===0){
+    idListHtml='<div class="empty" style="padding:20px 10px"><div class="ei">👤</div>暂无身份<br>点击下方添加</div>';
+  }else{
+    profiles.forEach(function(p){
+      var on=p.id===aid;
+      idListHtml+='<div class="card" style="margin-bottom:8px;padding:10px;'+(on?'border:2px solid var(--primary);background:#ebf8ff':'')+'">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">'+
+        '<div style="flex:1;min-width:0">'+
+        '<div style="font-weight:600;font-size:14px">'+escapeHtml(p.name||'(未命名)')+(on?' <span style="font-size:11px;color:var(--primary)">当前</span>':'')+'</div>'+
+        '<div style="font-size:12px;color:#888;margin-top:2px">'+escapeHtml(p.department||'未设置科室')+(p.role?' · '+escapeHtml(p.role):'')+'</div>'+
+        '</div>'+
+        '<div class="row-actions" style="flex-shrink:0">'+
+        (on?'':'<button class="btn-mini" data-setactive="'+p.id+'">设为当前</button>')+
+        '<button class="btn-mini" data-editprofile="'+p.id+'">编辑</button>'+
+        (profiles.length>1?'<button class="btn-mini danger" data-delprofile="'+p.id+'">删除</button>':'')+
+        '</div></div></div>';
+    });
+  }
+
+  app.innerHTML='<div class="page"><div class="page-header"><h2>设置</h2><p>身份管理与数据管理</p></div>'+
+    '<div class="card"><div class="card-title">身份管理 <button class="btn-mini" id="set_addprofile">+ 添加身份</button></div>'+
+    idListHtml+
+    '</div>'+
+    '<div class="card"><div class="card-title">编辑当前身份</div>'+
     '<div class="form-group"><label>姓名</label><input id="set_name" value="'+escapeHtml(t.name)+'" placeholder="请输入姓名"></div>'+
-    '<div class="form-group"><label>科室</label><input id="set_dept" value="'+escapeHtml(t.department)+'" placeholder="请输入科室"></div>'+
-    '<button class="btn" id="set_save">保存信息</button></div>'+
+    '<div class="form-group"><label>科室</label><input id="set_dept" value="'+escapeHtml(t.department||'')+'" placeholder="请输入科室"></div>'+
+    '<div class="form-group"><label>角色/职称</label><input id="set_role" value="'+escapeHtml(t.role||'')+'" placeholder="如：主管治疗师"></div>'+
+    '<button class="btn" id="set_save">保存当前身份</button></div>'+
     '<div class="card"><div class="card-title">数据管理</div>'+
+    '<button class="btn btn-ghost" id="set_excel" style="margin-bottom:10px">📊 导出Excel</button>'+
     '<button class="btn btn-ghost" id="set_export" style="margin-bottom:10px">📤 导出JSON备份</button>'+
     '<button class="btn btn-danger" id="set_clear">🗑 清空所有数据</button></div>'+
     '<div class="card" style="text-align:center;font-size:12px;color:#999"><p>治疗师拍照记录系统 v1.0</p><p>所有数据保存在本地，不会上传服务器</p></div></div>';
 
+  // save current identity (edits active profile)
   document.getElementById('set_save').onclick=function(){
     var name=document.getElementById('set_name').value.trim();
     var dept=document.getElementById('set_dept').value.trim();
-    setTherapist({name:name,department:dept});
-    toast('已保存');
+    var role=document.getElementById('set_role').value.trim();
+    if(profiles.length===0){
+      // create first profile
+      var np={id:uid(),name:name,department:dept,role:role};
+      setProfiles([np]);
+      setActiveProfileId(np.id);
+    }else{
+      var ap=getActiveProfile();
+      if(ap){
+        ap.name=name;ap.department=dept;ap.role=role;
+        var arr=getProfiles();
+        for(var i=0;i<arr.length;i++){if(arr[i].id===ap.id){arr[i]=ap;break}}
+        setProfiles(arr);
+      }
+    }
+    toast('已保存');route('/settings');
   };
+  // add identity
+  document.getElementById('set_addprofile').onclick=function(){showProfileForm(null)};
+  // edit identity
+  var edEls=document.querySelectorAll('[data-editprofile]');
+  for(var i=0;i<edEls.length;i++){(function(el){el.onclick=function(e){e.stopPropagation();showProfileForm(el.getAttribute('data-editprofile'))}})(edEls[i])}
+  // set as active
+  var saEls=document.querySelectorAll('[data-setactive]');
+  for(var j=0;j<saEls.length;j++){(function(el){el.onclick=function(e){e.stopPropagation();setActiveProfileId(el.getAttribute('data-setactive'));toast('已设为当前身份');route('/settings')}})(saEls[j])}
+  // delete identity
+  var dlEls=document.querySelectorAll('[data-delprofile]');
+  for(var k=0;k<dlEls.length;k++){(function(el){el.onclick=function(e){e.stopPropagation();confirmDialog('确定删除该身份？已关联记录保留但显示原治疗师名',function(){
+    var id=el.getAttribute('data-delprofile');
+    var arr=getProfiles().filter(function(p){return p.id!==id});
+    setProfiles(arr);
+    if(getActiveProfileId()===id){setActiveProfileId(arr.length>0?arr[0].id:'')}
+    toast('已删除');route('/settings');
+  })}})(dlEls[k])}
+
+  document.getElementById('set_excel').onclick=function(){exportExcel()};
   document.getElementById('set_export').onclick=function(){exportData()};
   document.getElementById('set_clear').onclick=function(){
     confirmDialog('将清空所有患者、记录和照片，且不可恢复，确定？',function(){
       confirmDialog('再次确认清空全部数据？',function(){
-        LS.del('therapist_info');LS.del('patients');LS.del('records');
+        LS.del('therapist_info');LS.del('therapist_profiles');LS.del('active_profile_id');LS.del('patients');LS.del('records');
         DB.clear().then(function(){toast('已清空所有数据');go('/home')});
       });
     });
   };
 };
+
+/* profile form modal (add/edit identity) */
+function showProfileForm(id){
+  var p={name:'',department:'',role:''};
+  var profiles=getProfiles();
+  if(id){for(var i=0;i<profiles.length;i++){if(profiles[i].id===id){p=profiles[i];break}}}
+  var mask=document.createElement('div');
+  mask.className='modal-mask';
+  mask.innerHTML='<div class="modal"><div class="modal-hd"><span>'+(id?'编辑身份':'添加身份')+'</span><span class="close">&times;</span></div>'+
+    '<div class="modal-bd">'+
+    '<div class="form-group"><label>姓名</label><input id="pf_id_name" value="'+escapeHtml(p.name)+'" placeholder="治疗师姓名"></div>'+
+    '<div class="form-group"><label>科室</label><input id="pf_id_dept" value="'+escapeHtml(p.department)+'" placeholder="如：康复科"></div>'+
+    '<div class="form-group"><label>角色/职称</label><input id="pf_id_role" value="'+escapeHtml(p.role)+'" placeholder="如：主管治疗师"></div>'+
+    '</div><div class="modal-ft"><button class="btn btn-ghost" id="pf_id_cancel">取消</button><button class="btn" id="pf_id_save">保存</button></div></div>';
+  document.body.appendChild(mask);
+  mask.querySelector('.close').onclick=function(){mask.remove()};
+  document.getElementById('pf_id_cancel').onclick=function(){mask.remove()};
+  document.getElementById('pf_id_save').onclick=function(){
+    var name=document.getElementById('pf_id_name').value.trim();
+    var dept=document.getElementById('pf_id_dept').value.trim();
+    var role=document.getElementById('pf_id_role').value.trim();
+    if(!name){toast('请输入姓名');return}
+    var arr=getProfiles();
+    if(id){
+      for(var i=0;i<arr.length;i++){if(arr[i].id===id){arr[i].name=name;arr[i].department=dept;arr[i].role=role;break}}
+    }else{
+      var np={id:uid(),name:name,department:dept,role:role};
+      arr.push(np);
+      // if first profile, set as active
+      if(arr.length===1){setActiveProfileId(np.id)}
+    }
+    setProfiles(arr);
+    mask.remove();toast('已保存');route('/settings');
+  };
+  mask.onclick=function(e){if(e.target===mask)mask.remove()};
+}
 
 function exportData(){
   var records=getRecords();
@@ -873,20 +1130,60 @@ function finishExport(exp){
   toast('备份已下载');
 }
 
+function exportExcel(){
+  var records=getRecords().slice().sort(function(a,b){return a.timestamp-b.timestamp});
+  var html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
+  html+='<head><meta charset="UTF-8"></head><body>';
+  html+='<table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">';
+  html+='<tr style="background:#3182ce;color:#fff;font-weight:bold;text-align:center">';
+  var headers=['记录编号','治疗师','患者','治疗时间','地点','治疗类型','验证码'];
+  headers.forEach(function(h){html+='<td>'+h+'</td>'});
+  html+='</tr>';
+  records.forEach(function(r,idx){
+    var bg=idx%2===0?'#ffffff':'#f7fafc';
+    html+='<tr style="background:'+bg+'">';
+    html+='<td>'+escapeHtml(r.recordNo)+'</td>';
+    html+='<td>'+escapeHtml(r.therapistName)+'</td>';
+    html+='<td>'+escapeHtml(r.patientName)+'</td>';
+    html+='<td>'+fmtTimeShort(r.timestamp)+'</td>';
+    html+='<td>'+escapeHtml(r.location)+'</td>';
+    html+='<td>'+escapeHtml(r.treatmentType)+'</td>';
+    html+='<td>'+simpleHash(r.recordNo+r.patientName+r.timestamp+r.treatmentType+r.location)+'</td>';
+    html+='</tr>';
+  });
+  html+='</table></body></html>';
+  var blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download='治疗记录_'+todayStr()+'.xls';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url)},1000);
+  toast('Excel已下载');
+}
+
 /* ========================= Onboarding ========================= */
 function showOnboarding(){
   var mask=document.createElement('div');
   mask.className='modal-mask';
   mask.innerHTML='<div class="modal"><div class="modal-bd"><div class="onboard-welcome"><div class="logo">💊</div><h3>欢迎使用</h3><p style="color:#888;font-size:13px">治疗师拍照记录系统</p></div>'+
     '<div class="form-group"><label>姓名（可跳过稍后设置）</label><input id="ob_name" placeholder="治疗师姓名"></div>'+
-    '<div class="form-group"><label>科室</label><input id="ob_dept" placeholder="如：康复科"></div></div>'+
+    '<div class="form-group"><label>科室</label><input id="ob_dept" placeholder="如：康复科"></div>'+
+    '<div class="form-group"><label>角色/职称（可选）</label><input id="ob_role" placeholder="如：主管治疗师"></div></div>'+
     '<div class="modal-ft"><button class="btn btn-ghost" id="ob_skip">跳过</button><button class="btn" id="ob_ok">开始使用</button></div></div>';
   document.body.appendChild(mask);
   document.getElementById('ob_skip').onclick=function(){LS.set('onboarded',true);mask.remove()};
   document.getElementById('ob_ok').onclick=function(){
     var name=document.getElementById('ob_name').value.trim();
     var dept=document.getElementById('ob_dept').value.trim();
-    setTherapist({name:name,department:dept});
+    var role=document.getElementById('ob_role').value.trim();
+    if(name){
+      // save first profile into therapist_profiles array
+      var profiles=getProfiles();
+      var np={id:uid(),name:name,department:dept,role:role};
+      profiles.push(np);
+      setProfiles(profiles);
+      setActiveProfileId(np.id);
+    }
     LS.set('onboarded',true);
     mask.remove();toast('设置成功');route('/home');
   };
