@@ -1,0 +1,101 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8"></head><body>
+
+<table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">
+<tr style="background:#3182ce;color:#fff;font-weight:bold;text-align:center"><td colspan="8" style="font-size:14px">康复评估系统 - 患者信息汇总</td></tr>
+<tr style="background:#3182ce;color:#fff;font-weight:bold;text-align:center">
+<td>序号</td><td>患者ID</td><td>姓名</td><td>性别</td><td>年龄</td><td>诊断</td><td>创建时间</td><td>治疗师</td>
+</tr>
+<tr style="background:#ffffff">
+<td>1</td><td style="font-family:monospace">P-20250731-1234</td><td>张三</td><td>男</td><td>45</td><td>腰椎间盘突出</td><td>2025-07-31</td><td>王医生</td>
+</tr>
+<tr style="background:#f7fafc">
+<td>2</td><td style="font-family:monospace">P-20250731-5678</td><td>李四</td><td>女</td><td>62</td><td>脑卒中后遗症</td><td>2025-07-31</td><td>王医生</td>
+</tr>
+</table>
+
+<p></p>
+<table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">
+<tr style="background:#38a169;color:#fff;font-weight:bold;text-align:center"><td colspan="9" style="font-size:14px">拍照治疗记录</td></tr>
+<tr style="background:#38a169;color:#fff;font-weight:bold;text-align:center">
+<td>记录编号</td><td>治疗师</td><td>患者</td><td>治疗时间</td><td>地点</td><td>治疗类型</td><td>时间(分钟)</td><td>验证码</td><td>备注</td>
+</tr>
+<tr style="background:#ffffff">
+<td style="font-family:monospace">R-20250731-001</td><td>王医生</td><td>张三</td><td>2025-07-31 09:00</td><td>康复大厅</td><td>运动功能训练</td><td>30分钟</td><td style="font-family:monospace">a3f8b2c1</td><td>首次治疗</td>
+</tr>
+<tr style="background:#f7fafc">
+<td style="font-family:monospace">R-20250731-002</td><td>王医生</td><td>张三</td><td>2025-07-31 14:30</td><td>病房</td><td>吞咽功能训练</td><td>30分钟</td><td style="font-family:monospace">7d9e1f4a</td><td></td>
+</tr>
+<tr style="background:#ffffff">
+<td style="font-family:monospace">R-20250731-003</td><td>王医生</td><td>李四</td><td>2025-07-31 10:00</td><td>作业治疗室</td><td>生活技能康复训练</td><td>30分钟</td><td style="font-family:monospace">c2e5a9d3</td><td>ADL训练</td>
+</tr>
+</table>
+
+<p></p>
+<table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">
+<tr style="background:#805ad5;color:#fff;font-weight:bold;text-align:center"><td colspan="9" style="font-size:14px">主诉与客观评估数据</td></tr>
+<tr style="background:#805ad5;color:#fff;font-weight:bold;text-align:center">
+<td>患者</td><td>主要症状</td><td>发病时间</td><td>诱因</td><td>触诊部位</td><td>压痛(0-10)</td><td>活动度</td><td>肌力</td><td>皮温(左/右)</td>
+</tr>
+<tr style="background:#ffffff">
+<td>张三</td><td>腰痛伴右下肢放射痛</td><td>3天前</td><td>搬重物</td><td>腰椎、骶髂关节</td><td>7</td><td>腰椎:主30°/被45°; 髋:主80°/被90°</td><td>腰伸:3级; 髋屈:4级</td><td>36.2/36.5</td>
+</tr>
+<tr style="background:#f7fafc">
+<td>李四</td><td>右侧肢体无力</td><td>2周前</td><td>脑卒中</td><td>肩关节</td><td>3</td><td>肩:主60°/被120°; 膝:主70°/被110°</td><td>肩屈:2级; 膝伸:3级</td><td>36.0/36.3</td>
+</tr>
+</table>
+
+<p></p>
+<table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">
+<tr style="background:#d69e2e;color:#fff;font-weight:bold;text-align:center"><td colspan="6" style="font-size:14px">量表评估数据</td></tr>
+<tr style="background:#d69e2e;color:#fff;font-weight:bold;text-align:center">
+<td>患者</td><td>量表类型</td><td>得分</td><td>结论</td><td>测评时间</td><td>治疗师</td>
+</tr>
+<tr style="background:#ffffff"><td>张三</td><td>VAS</td><td>7</td><td>重度疼痛</td><td>2025-07-31 09:15</td><td>王医生</td></tr>
+<tr style="background:#f7fafc"><td>张三</td><td>NRS</td><td>7</td><td>重度疼痛</td><td>2025-07-31 09:16</td><td>王医生</td></tr>
+<tr style="background:#ffffff"><td>张三</td><td>MPQ</td><td>18</td><td>中重度疼痛</td><td>2025-07-31 09:20</td><td>王医生</td></tr>
+<tr style="background:#f7fafc"><td>张三</td><td>Barthel</td><td>65</td><td>中度依赖</td><td>2025-07-31 09:25</td><td>王医生</td></tr>
+<tr style="background:#ffffff"><td>李四</td><td>VAS</td><td>3</td><td>轻度疼痛</td><td>2025-07-31 10:15</td><td>王医生</td></tr>
+<tr style="background:#f7fafc"><td>李四</td><td>Barthel</td><td>45</td><td>重度依赖</td><td>2025-07-31 10:20</td><td>王医生</td></tr>
+</table>
+
+<p></p>
+<table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">
+<tr style="background:#e53e3e;color:#fff;font-weight:bold;text-align:center"><td colspan="7" style="font-size:14px">康复方案数据</td></tr>
+<tr style="background:#e53e3e;color:#fff;font-weight:bold;text-align:center">
+<td>患者</td><td>阶段</td><td>治疗目标</td><td>治疗频率</td><td>治疗项目</td><td>参数</td><td>注意事项</td>
+</tr>
+<tr style="background:#ffffff"><td>张三</td><td>急性期(0-2周)</td><td>控制疼痛减轻炎症</td><td>每日</td><td>运动功能训练</td><td>镇痛模式</td><td>避免负重</td></tr>
+<tr style="background:#f7fafc"><td>张三</td><td>急性期(0-2周)</td><td>控制疼痛减轻炎症</td><td>每日</td><td>电疗</td><td>15分钟</td><td>避免负重</td></tr>
+<tr style="background:#ffffff"><td>张三</td><td>亚急性期(2-6周)</td><td>增强肌力</td><td>隔日</td><td>运动功能训练</td><td>低负荷3级肌力训练</td><td>循序渐进</td></tr>
+<tr style="background:#f7fafc"><td>张三</td><td>慢性期(6周+)</td><td>功能恢复与巩固</td><td>每周3次</td><td>运动功能训练</td><td>循序渐进</td><td>持续家庭训练</td></tr>
+<tr style="background:#ffffff"><td>李四</td><td>急性期(0-2周)</td><td>预防并发症</td><td>每日</td><td>吞咽功能训练</td><td>30分钟</td><td>监测生命体征</td></tr>
+<tr style="background:#f7fafc"><td>李四</td><td>亚急性期(2-6周)</td><td>恢复ADL能力</td><td>隔日</td><td>生活技能康复训练</td><td>穿衣/进食/如厕</td><td>家属参与</td></tr>
+</table>
+
+<p></p>
+<table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">
+<tr style="background:#319795;color:#fff;font-weight:bold;text-align:center"><td colspan="5" style="font-size:14px">特殊检查数据</td></tr>
+<tr style="background:#319795;color:#fff;font-weight:bold;text-align:center">
+<td>患者</td><td>检查项目</td><td>结果</td><td>备注</td><td>检查时间</td>
+</tr>
+<tr style="background:#ffffff"><td>张三</td><td>直腿抬高试验</td><td>阳性</td><td>右侧40°阳性</td><td>2025-07-31 09:10</td></tr>
+<tr style="background:#f7fafc"><td>张三</td><td>4字试验(Patrick)</td><td>阳性</td><td>右侧阳性</td><td>2025-07-31 09:11</td></tr>
+<tr style="background:#ffffff"><td>张三</td><td>Lachman试验</td><td>阴性</td><td>-</td><td>2025-07-31 09:12</td></tr>
+<tr style="background:#f7fafc"><td>李四</td><td>布鲁津斯基征</td><td>阴性</td><td>-</td><td>2025-07-31 10:10</td></tr>
+</table>
+
+<p></p>
+<table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">
+<tr style="background:#2d3748;color:#fff;font-weight:bold;text-align:center"><td colspan="2" style="font-size:14px">数据统计汇总</td></tr>
+<tr><td style="background:#f7fafc">导出时间</td><td>2025-07-31 18:00</td></tr>
+<tr><td style="background:#f7fafc">治疗师</td><td>王医生 (康复科)</td></tr>
+<tr><td style="background:#f7fafc">患者总数</td><td>2 人</td></tr>
+<tr><td style="background:#f7fafc">拍照记录总数</td><td>3 条</td></tr>
+<tr><td style="background:#f7fafc">评估记录总数</td><td>2 份</td></tr>
+<tr><td style="background:#f7fafc">量表评估总数</td><td>6 条</td></tr>
+<tr><td style="background:#f7fafc">康复方案总数</td><td>2 份</td></tr>
+<tr><td style="background:#f7fafc">特殊检查总数</td><td>4 条</td></tr>
+</table>
+
+</body></html>
