@@ -1127,7 +1127,7 @@ routes['/patients']=function(param,query){
   }
   app.innerHTML='<div class="page"><div class="page-header"><h2>患者管理</h2><p>共 '+patients.length+' 位患者 '+roleBadge+'</p></div>'+
     '<div class="search-box"><span class="ic">🔍</span><input id="pat_search" placeholder="按姓名或患者ID搜索"></div>'+
-    '<div class="card" style="padding:10px;margin-bottom:10px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">📋 按患者ID直接加载</div><div style="display:flex;gap:8px"><input id="pat_id_input" placeholder="输入患者ID（如P-20250731-AB12）" style="flex:1;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px"><button class="btn" id="pat_id_load" style="white-space:nowrap">加载</button></div></div>'+
+    '<div class="card" style="padding:10px;margin-bottom:10px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">📋 按患者ID直接加载</div><div style="display:flex;gap:8px"><input id="pat_id_input" placeholder="输入患者ID（如P-20250731-1234）" style="flex:1;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px"><button class="btn" id="pat_id_load" style="white-space:nowrap">加载</button></div></div>'+
     '<div class="card"><div class="card-title">患者列表 <button class="btn-mini" id="addPatient">+ 新增</button></div>'+list+'</div></div>';
 
   document.getElementById('addPatient').onclick=function(){showPatientForm(null)};
@@ -2871,11 +2871,6 @@ routes['/plan/:id']=function(id){
           var line='  '+(idx+1)+'. '+it.name+'（'+it.category+'）';
           var meta=[];
           if(it.params)meta.push(it.params);
-          if(it.dur)meta.push(it.dur);
-          if(it.freq)meta.push(it.freq);
-          if(it.sets)meta.push(it.sets+'组');
-          if(it.reps)meta.push(it.reps+'次');
-          if(it.part)meta.push('部位：'+it.part);
           if(meta.length)line+=' ['+meta.join('，')+']';
           text+=line+'\n';
         });
@@ -3045,26 +3040,33 @@ routes['/report/:id']=function(id){
     text+='报告时间：'+fmtTime(Date.now())+'\n';
     text+='═══════════════\n';
     // 主诉
+    var cc=asm&&asm.chiefComplaint?asm.chiefComplaint:{};
     if(asm){
       text+='\n【主诉】\n';
-      if(asm.symptoms)text+='主要症状：'+asm.symptoms+'\n';
-      if(asm.onset)text+='发病时间：'+asm.onset+'\n';
-      if(asm.triggers)text+='诱因：'+asm.triggers+'\n';
+      if(cc.symptoms)text+='主要症状：'+cc.symptoms+'\n';
+      if(cc.onset)text+='发病时间：'+cc.onset+'\n';
+      if(cc.triggers)text+='诱因：'+cc.triggers+'\n';
     }
     // 客观评估
+    var pal=asm&&asm.palpation?asm.palpation:{};
+    var skinT=asm&&asm.skinTemp?asm.skinTemp:{};
     if(asm){
       text+='\n【客观评估】\n';
-      if(asm.palpation&&(asm.palpation.sites&&asm.palpation.sites.length))text+='触诊疼痛部位：'+asm.palpation.sites.join('、')+'\n';
-      if(asm.palpation&&asm.palpation.pain!=null)text+='压痛程度：'+asm.palpation.pain+'/10分\n';
+      if(pal.sites&&pal.sites.length)text+='触诊疼痛部位：'+pal.sites.join('、')+'\n';
+      if(pal.painLevel!=null)text+='压痛程度：'+pal.painLevel+'/10分\n';
       if(asm.rom&&asm.rom.length){text+='活动度：';asm.rom.forEach(function(r){text+=r.joint+'(主'+r.active+'°/被'+r.passive+'°) '});text+='\n'}
       if(asm.muscle&&asm.muscle.length){text+='肌力：';asm.muscle.forEach(function(m){text+=m.group+':'+m.grade+'级 '});text+='\n'}
-      if(asm.skin&&(asm.skin.left||asm.skin.right))text+='皮温：左'+(asm.skin.left||'-')+'℃ 右'+(asm.skin.right||'-')+'℃\n';
-      if(asm.adl){text+='ADL总分：'+(asm.adl.total!=null?asm.adl.total:'-')+'分\n'}
+      if(skinT.left||skinT.right)text+='皮温：左'+(skinT.left||'-')+'℃ 右'+(skinT.right||'-')+'℃\n';
+      if(asm.adl&&asm.adl.items){
+        var adlTotal=0,adlCount=0;
+        ADL_ITEMS.forEach(function(it){if(asm.adl.items[it]!=null){adlTotal+=asm.adl.items[it];adlCount++}});
+        if(adlCount>0){var adlPct=Math.round((1-adlTotal/(adlCount*2))*100);text+='ADL总分：'+adlTotal+'分 / 独立程度：'+adlPct+'%\n'}
+      }
     }
     // 量表
     if(scales&&scales.length){
       text+='\n【量表评估】\n';
-      scales.forEach(function(s){text+=s.type+': '+s.score+'分（'+(s.conclusion||'')+'）\n'});
+      scales.forEach(function(s){text+=(s.scaleType||'量表')+': '+s.score+'分（'+(s.conclusion||'')+'）\n'});
     }
     // 方案
     if(plan){
