@@ -285,7 +285,8 @@ a{text-decoration:none;color:inherit}
 .alert.info{background:#bee3f8;color:#2c5282}
 
 /* treatment item price & enhanced card */
-.ti-price{margin-top:6px;font-size:12px;color:#e53e3e;font-weight:600;padding:4px 8px;background:#fff5f5;border-radius:4px;display:inline-block}
+.ti-desc{margin-top:6px;font-size:12px;color:#2d3748;padding:6px 8px;background:#edf2f7;border-radius:4px;line-height:1.5}
+.ti-desc b{color:#2b6cb0}
 .treat-item{background:#f7fafc;border-radius:8px;padding:10px;margin-bottom:8px}
 .di-hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px}
 .ti-name{font-weight:600;font-size:14px}
@@ -1625,8 +1626,8 @@ routes['/settings']=function(){
     '<button class="btn btn-ghost" id="set_expall_patients" style="margin-top:10px">📤 导出全部患者JSON</button>'+
     '</div>'+
 
-    '<div class="card"><div class="card-title">东营市康复医疗服务价格查询</div>'+
-    '<div class="search-box"><span class="ic">🔍</span><input id="dy_search" placeholder="输入项目名搜索（如：认知功能训练）"></div>'+
+    '<div class="card"><div class="card-title">东营市康复医疗项目内涵查询</div>'+
+    '<div class="search-box"><span class="ic">🔍</span><input id="dy_search" placeholder="输入项目名或内涵关键词搜索（如：认知、吞咽、意识）"></div>'+
     '<div class="form-group"><label>分类筛选</label><select id="dy_cat_filter"><option value="">全部分类</option>'+getDYCategories().map(function(c){return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>'}).join('')+'</select></div>'+
     '<div id="dy_result"></div></div>'+
 
@@ -1729,12 +1730,12 @@ routes['/settings']=function(){
   // export all patients
   document.getElementById('set_expall_patients').onclick=function(){exportAllPatients()};
 
-  // 东营市价格查询功能
+  // 东营市项目内涵查询功能
   function renderDYPriceList(){
     var kw=(document.getElementById('dy_search').value||'').trim().toLowerCase();
     var cat=document.getElementById('dy_cat_filter').value;
     var list=DY_PRICE_LIST.filter(function(it){
-      var matchKw=!kw||(it.name||'').toLowerCase().indexOf(kw)>=0||(it.code||'').toLowerCase().indexOf(kw)>=0;
+      var matchKw=!kw||(it.name||'').toLowerCase().indexOf(kw)>=0||(it.code||'').toLowerCase().indexOf(kw)>=0||(it.desc||'').toLowerCase().indexOf(kw)>=0;
       var matchCat=!cat||it.category===cat;
       return matchKw&&matchCat;
     });
@@ -1744,24 +1745,18 @@ routes['/settings']=function(){
       wrap.innerHTML='<div class="empty" style="padding:16px"><div class="ei">💊</div>未找到匹配项目</div>';
       return;
     }
-    var html='<div style="font-size:12px;color:#666;margin-top:4px">共 '+list.length+' 项　点击任意行查看详情</div>';
-    html+='<div style="overflow-x:auto"><table class="price-table"><thead><tr><th style="width:120px">编码</th><th>名称</th><th style="width:50px">单位</th><th style="width:60px">三级</th><th style="width:60px">二级</th><th style="width:60px">一级</th><th style="min-width:120px">备注</th></tr></thead><tbody>';
+    var html='<div style="font-size:12px;color:#666;margin-top:4px">共 '+list.length+' 项</div>';
     list.forEach(function(it){
-      html+='<tr data-dy-code="'+escapeHtml(it.code)+'">'+
-        '<td style="font-family:monospace;font-size:11px;color:#666">'+escapeHtml(it.code)+'</td>'+
-        '<td><b>'+escapeHtml(it.name)+'</b>'+(it.desc?'<div class="cd">'+escapeHtml(it.desc)+'</div>':'')+'</td>'+
-        '<td>'+escapeHtml(it.unit)+'</td>'+
-        '<td class="p3">'+(it.price3?it.price3.toFixed(2):'—')+'</td>'+
-        '<td>'+(it.price2?it.price2.toFixed(2):'—')+'</td>'+
-        '<td>'+(it.price1?it.price1.toFixed(2):'—')+'</td>'+
-        '<td>'+(it.note?escapeHtml(it.note):'')+'</td>'+
-        '</tr>';
+      html+='<div style="padding:10px;border-bottom:1px solid #edf2f7">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
+        '<b style="font-size:14px;color:#2d3748">'+escapeHtml(it.name)+'</b>'+
+        '<span style="font-size:11px;color:#a0aec0">'+escapeHtml(it.code)+'</span>'+
+        '</div>'+
+        '<div style="font-size:11px;color:#718096;margin:4px 0 6px"><span style="background:#ebf8ff;color:#2b6cb0;padding:1px 6px;border-radius:3px">'+escapeHtml(it.category)+'</span>'+(it.unit?' · '+escapeHtml(it.unit):'')+'</div>'+
+        (it.desc?'<div style="font-size:12px;color:#2d3748;line-height:1.5;padding:6px 8px;background:#edf2f7;border-radius:4px"><b style="color:#2b6cb0">内涵：</b>'+escapeHtml(it.desc)+'</div>':'')+
+        (it.note?'<div style="font-size:11px;color:#a0aec0;margin-top:4px"><b>备注：</b>'+escapeHtml(it.note)+'</div>':'')+
+        '</div>';
     });
-    html+='</tbody></table></div>';
-    // 合计
-    var sum3=0,sum2=0,sum1=0;
-    list.forEach(function(it){sum3+=(it.price3||0);sum2+=(it.price2||0);sum1+=(it.price1||0)});
-    html+='<div style="margin-top:10px;font-size:12px;color:#666;padding:8px;background:#f7fafc;border-radius:6px">筛选结果合计：三级 <b style="color:#e53e3e">￥'+sum3.toFixed(2)+'</b>　二级 ￥'+sum2.toFixed(2)+'　一级 ￥'+sum1.toFixed(2)+'</div>';
     wrap.innerHTML=html;
   }
   renderDYPriceList();
@@ -2652,13 +2647,13 @@ routes['/plan/:id']=function(id){
       if(it.load)metaParts.push('负荷：'+it.load);
       if(it.part)metaParts.push('部位：'+it.part);
       var dy=findDYPrice(it.name);
-      var priceHtml='';
-      if(dy){
-        priceHtml='<div class="ti-price">💰 三级：'+fmtPrice(dy.price3)+' ｜二级：'+fmtPrice(dy.price2)+' ｜一级：'+fmtPrice(dy.price1)+' · '+escapeHtml(dy.unit)+'</div>';
+      var descHtml='';
+      if(dy&&dy.desc){
+        descHtml='<div class="ti-desc"><b>项目内涵：</b>'+escapeHtml(dy.desc)+'</div>';
       }
       itemsHtml+='<div class="treat-item"><div class="di-hd"><span class="ti-name">'+escapeHtml(it.name)+' <span class="tag">'+escapeHtml(it.category)+'</span></span><span class="di-rm" data-rm-item="'+stage+'_'+idx+'">删除</span></div>'+
         '<div class="ti-meta">'+escapeHtml(metaParts.join(' · '))+'</div>'+
-        priceHtml+
+        descHtml+
         (it.video?'<span class="ti-video" data-vid="'+escapeHtml(it.video)+'">▶ 观看示范</span>':'')+
         '</div>';
     });
@@ -2888,40 +2883,36 @@ routes['/report/:id']=function(id){
   }
   s5+='</div>';
 
-  // 5.5 费用参考汇总
-  var s55='<div class="report-section"><h3>六、费用参考汇总（东营市价格）</h3>';
-  var feeRows=[];
-  var total3=0;
+  // 5.5 治疗项目内涵汇总
+  var s55='<div class="report-section"><h3>六、治疗项目内涵汇总</h3>';
+  var descRows=[];
   if(plan){
     PLAN_STAGES.forEach(function(ps){
       var st=plan[ps.key];
       if(st&&st.items&&st.items.length){
         st.items.forEach(function(it){
           var dy=findDYPrice(it.name);
-          if(dy){
-            feeRows.push({name:it.name,unit:dy.unit,price3:dy.price3,stage:ps.name});
-            if(dy.price3)total3+=dy.price3;
+          if(dy&&dy.desc){
+            descRows.push({name:it.name,desc:dy.desc,unit:dy.unit,stage:ps.name,category:dy.category});
           }
         });
       }
     });
   }
-  if(feeRows.length===0){
-    s55+='<div class="r-row"><div class="rv">方案中暂无可匹配东营市价格表的项目</div></div>';
+  if(descRows.length===0){
+    s55+='<div class="r-row"><div class="rv">方案中暂无可匹配内涵说明的项目</div></div>';
   }else{
-    s55+='<table class="r-summary-table"><thead><tr><th>项目名</th><th>单位</th><th>三级(元)</th><th>阶段</th></tr></thead><tbody>';
-    feeRows.forEach(function(r){
-      s55+='<tr><td style="text-align:left">'+escapeHtml(r.name)+'</td><td>'+escapeHtml(r.unit)+'</td><td class="p3" style="color:#e53e3e;font-weight:600">'+(r.price3?r.price3.toFixed(2):'—')+'</td><td>'+escapeHtml(r.stage)+'</td></tr>';
+    s55+='<table class="r-summary-table"><thead><tr><th>项目名</th><th>内涵说明</th><th>阶段</th></tr></thead><tbody>';
+    descRows.forEach(function(r){
+      s55+='<tr><td style="text-align:left;white-space:nowrap">'+escapeHtml(r.name)+(r.unit?'<br><span style="font-size:11px;color:#999">'+escapeHtml(r.unit)+'</span>':'')+'</td><td style="text-align:left;font-size:12px;line-height:1.5">'+escapeHtml(r.desc)+'</td><td>'+escapeHtml(r.stage)+'</td></tr>';
     });
-    s55+='<tr class="total-row"><td style="text-align:left" colspan="2">单次参考价合计（三级）</td><td colspan="2">￥'+total3.toFixed(2)+'</td></tr>';
     s55+='</tbody></table>';
-    s55+='<div class="r-block" style="margin-top:8px"><b>说明：</b>以上费用为单次治疗参考价（按三级医院标准），实际收费以医院当日公示为准；二级/一级价格可查阅系统设置页中的价格查询功能。</div>';
   }
   s55+='</div>';
 
   // 6. notes
   var s6='<div class="report-section"><h3>七、注意事项</h3>'+
-    '<div class="r-block">1. 本报告基于当前评估数据生成，仅供康复治疗参考。<br>2. 治疗过程中如出现不适，请及时告知治疗师。<br>3. 建议定期复评，动态调整康复方案。<br>4. 报告生成时间：'+fmtTime(Date.now())+'</div>'+
+    '<div class="r-block">1. 本报告基于当前评估数据生成，仅供康复治疗参考。<br>2. 治疗过程中如出现不适，请及时告知治疗师。<br>3. 建议定期复评，动态调整康复方案。<br>4. 项目内涵说明可在系统设置页中查阅完整内容。<br>5. 报告生成时间：'+fmtTime(Date.now())+'</div>'+
     '</div>';
 
   var t=getTherapist();
