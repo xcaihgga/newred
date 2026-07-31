@@ -1302,7 +1302,19 @@ routes['/camera']=function(param,query){
   var opts='';
   patients.forEach(function(p){opts+='<option value="'+p.id+'"'+(p.id===presetPid?' selected':'')+'>'+escapeHtml(p.name)+'</option>'});
   var topts='';
-  TREATMENT_TYPES.forEach(function(tp){topts+='<option value="'+tp+'"'+(tp===presetType?' selected':'')+'>'+tp+'</option>'});
+  // 治疗类型从东营市项目中选择
+  getDYCategories().forEach(function(cat){
+    topts+='<optgroup label="'+escapeHtml(cat)+'">';
+    getDYItemsByCategory(cat).forEach(function(it){
+      topts+='<option value="'+escapeHtml(it.name)+'">'+escapeHtml(it.name)+'</option>';
+    });
+    topts+='</optgroup>';
+  });
+  topts+='<option value="其他">其他</option>';
+  // 地点预设
+  var LOCATIONS=['康复大厅','作业治疗室','言语治疗室','康复门诊','病房','物理治疗室','理疗室'];
+  var savedLocs=LS.get('customLocations')||[];
+  var allLocs=LOCATIONS.concat(savedLocs);
   var idopts='';
   if(profiles.length===0){
     idopts='<option value="">'+escapeHtml(t.name||'(未设置)')+'</option>';
@@ -1320,7 +1332,9 @@ routes['/camera']=function(param,query){
     '<div class="form-group"><label>当前身份</label><select id="cam_identity" '+(profiles.length===0?'disabled':'')+'>'+idopts+'</select></div>'+
     '<div class="form-group"><label>选择患者</label><select id="cam_pid">'+opts+'</select></div>'+
     '<div class="form-group"><label>治疗类型</label><select id="cam_type">'+topts+'</select></div>'+
-    '<div class="form-group"><label>地点</label><input id="cam_loc" value="" placeholder="如：3楼康复科治疗室"></div>'+
+    '<div class="form-group"><label>地点</label><select id="cam_loc_sel"><option value="">请选择地点</option>'+allLocs.map(function(l){return '<option value="'+escapeHtml(l)+'">'+escapeHtml(l)+'</option>'}).join('')+'<option value="__custom">+ 自定义添加...</option></select></div>'+
+    '<div class="form-group" id="cam_loc_custom_wrap" style="display:none"><label>自定义地点</label><div style="display:flex;gap:8px"><input id="cam_loc_custom" placeholder="输入地点名称"><button class="btn btn-ghost" id="cam_loc_add" style="white-space:nowrap">添加</button></div></div>'+
+    '<div class="form-group" id="cam_loc_manual_wrap" style="display:none"><label>地点（手动输入）</label><input id="cam_loc" value="" placeholder="输入地点"></div>'+
     '<div class="form-group"><label>治疗师姓名</label><input id="cam_th" value="'+escapeHtml(t.name)+'" placeholder="治疗师姓名"></div>'+
     '<div class="form-group"><label>治疗时间</label><input type="datetime-local" id="cam_time" value="'+dvalStr+'"></div>'+
     '<button class="btn" id="cam_shoot">📷 拍照</button>'+
@@ -1337,6 +1351,47 @@ routes['/camera']=function(param,query){
     '</div></div>';
 
   var fileInput=document.getElementById('cam_file');
+
+  // location select handler
+  var locSel=document.getElementById('cam_loc_sel');
+  if(locSel){
+    locSel.onchange=function(){
+      var customWrap=document.getElementById('cam_loc_custom_wrap');
+      var manualWrap=document.getElementById('cam_loc_manual_wrap');
+      if(this.value==='__custom'){
+        customWrap.style.display='';
+        manualWrap.style.display='';
+        var ci=document.getElementById('cam_loc_custom');
+        if(ci)ci.focus();
+      }else{
+        customWrap.style.display='none';
+        manualWrap.style.display='none';
+      }
+    };
+  }
+  // add custom location
+  var locAddBtn=document.getElementById('cam_loc_add');
+  if(locAddBtn){
+    locAddBtn.onclick=function(){
+      var ci=document.getElementById('cam_loc_custom');
+      var val=ci?ci.value.trim():'';
+      if(!val){toast('请输入地点名称');return}
+      var saved=LS.get('customLocations')||[];
+      if(saved.indexOf(val)<0&&LOCATIONS.indexOf(val)<0){
+        saved.push(val);
+        LS.set('customLocations',saved);
+      }
+      // add to select
+      var opt=document.createElement('option');
+      opt.value=val;opt.textContent=val;
+      locSel.insertBefore(opt,locSel.querySelector('option[value="__custom"]'));
+      locSel.value=val;
+      document.getElementById('cam_loc_custom_wrap').style.display='none';
+      document.getElementById('cam_loc_manual_wrap').style.display='none';
+      ci.value='';
+      toast('地点已添加：'+val);
+    };
+  }
 
   // identity change -> update therapist name input
   var idSel=document.getElementById('cam_identity');
@@ -1358,7 +1413,14 @@ routes['/camera']=function(param,query){
     var ps=getPatients();
     for(var i=0;i<ps.length;i++){if(ps[i].id===pid){pname=ps[i].name;break}}
     var type=document.getElementById('cam_type').value;
-    var loc=document.getElementById('cam_loc').value.trim()||'未填写';
+    var locSel=document.getElementById('cam_loc_sel');
+    var loc='';
+    if(locSel.value==='__custom'){
+      var manualInput=document.getElementById('cam_loc');
+      loc=manualInput?manualInput.value.trim():'';
+    }else{
+      loc=locSel.value||'未填写';
+    }
     var th=document.getElementById('cam_th').value.trim()||'未填写';
     var tval=document.getElementById('cam_time').value;
     var ts;
@@ -1688,7 +1750,7 @@ routes['/settings']=function(){
     '<div id="dy_result"></div></div>'+
 
     '<div class="card"><div class="card-title">数据备份与导入</div>'+
-    '<button class="btn btn-ghost" id="set_excel" style="margin-bottom:10px">📊 导出Excel（记录）</button>'+
+    '<button class="btn btn-ghost" id="set_excel" style="margin-bottom:10px">📊 导出Excel（全数据）</button>'+
     '<button class="btn btn-ghost" id="set_export" style="margin-bottom:10px">📤 导出全部数据JSON备份</button>'+
     '<button class="btn btn-ghost" id="set_import" style="margin-bottom:10px">📥 导入数据JSON（合并）</button>'+
     '<input type="file" id="set_import_file" accept="application/json" style="display:none">'+
@@ -1921,34 +1983,208 @@ function finishExport(exp){
 }
 
 function exportExcel(){
+  var patients=getPatients();
   var records=getRecords().slice().sort(function(a,b){return a.timestamp-b.timestamp});
+  var assessments=getAssessments();
+  var specialExams=getSpecialExams();
+  var scales=getScales();
+  var plans=getPlans();
+  var t=getTherapist();
+
   var html='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">';
   html+='<head><meta charset="UTF-8"></head><body>';
+
+  // Sheet 1: 患者信息汇总
   html+='<table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">';
+  html+='<tr style="background:#3182ce;color:#fff;font-weight:bold;text-align:center"><td colspan="8" style="font-size:14px">康复评估系统 - 患者信息汇总</td></tr>';
   html+='<tr style="background:#3182ce;color:#fff;font-weight:bold;text-align:center">';
-  var headers=['记录编号','治疗师','患者','治疗时间','地点','治疗类型','验证码'];
-  headers.forEach(function(h){html+='<td>'+h+'</td>'});
+  ['序号','患者ID','姓名','性别','年龄','诊断','创建时间','治疗师'].forEach(function(h){html+='<td>'+h+'</td>'});
+  html+='</tr>';
+  patients.forEach(function(p,idx){
+    var bg=idx%2===0?'#ffffff':'#f7fafc';
+    html+='<tr style="background:'+bg+'">';
+    html+='<td>'+(idx+1)+'</td>';
+    html+='<td style="font-family:monospace">'+escapeHtml(p.patientId||'-')+'</td>';
+    html+='<td>'+escapeHtml(p.name||'-')+'</td>';
+    html+='<td>'+escapeHtml(p.gender||'-')+'</td>';
+    html+='<td>'+escapeHtml(p.age||'-')+'</td>';
+    html+='<td>'+escapeHtml(p.diagnosis||'-')+'</td>';
+    html+='<td>'+escapeHtml(fmtDate(p.createdAt)||'-')+'</td>';
+    html+='<td>'+escapeHtml(p.createdBy||'-')+'</td>';
+    html+='</tr>';
+  });
+  html+='</table>';
+
+  // Sheet 2: 拍照治疗记录
+  html+='<p></p><table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">';
+  html+='<tr style="background:#38a169;color:#fff;font-weight:bold;text-align:center"><td colspan="9" style="font-size:14px">拍照治疗记录</td></tr>';
+  html+='<tr style="background:#38a169;color:#fff;font-weight:bold;text-align:center">';
+  ['记录编号','治疗师','患者','治疗时间','地点','治疗类型','时间(分钟)','验证码','备注'].forEach(function(h){html+='<td>'+h+'</td>'});
   html+='</tr>';
   records.forEach(function(r,idx){
     var bg=idx%2===0?'#ffffff':'#f7fafc';
+    var dur=r.duration?r.duration+'分钟':'-';
+    var vcode=simpleHash(r.recordNo+r.patientName+r.timestamp+r.treatmentType+r.location);
     html+='<tr style="background:'+bg+'">';
-    html+='<td>'+escapeHtml(r.recordNo)+'</td>';
+    html+='<td style="font-family:monospace">'+escapeHtml(r.recordNo)+'</td>';
     html+='<td>'+escapeHtml(r.therapistName)+'</td>';
     html+='<td>'+escapeHtml(r.patientName)+'</td>';
-    html+='<td>'+fmtTimeShort(r.timestamp)+'</td>';
+    html+='<td>'+escapeHtml(fmtTimeShort(r.timestamp))+'</td>';
     html+='<td>'+escapeHtml(r.location)+'</td>';
     html+='<td>'+escapeHtml(r.treatmentType)+'</td>';
-    html+='<td>'+simpleHash(r.recordNo+r.patientName+r.timestamp+r.treatmentType+r.location)+'</td>';
+    html+='<td>'+dur+'</td>';
+    html+='<td style="font-family:monospace">'+vcode+'</td>';
+    html+='<td>'+escapeHtml(r.note||'')+'</td>';
     html+='</tr>';
   });
-  html+='</table></body></html>';
+  html+='</table>';
+
+  // Sheet 3: 评估数据
+  html+='<p></p><table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">';
+  html+='<tr style="background:#805ad5;color:#fff;font-weight:bold;text-align:center"><td colspan="9" style="font-size:14px">主诉与客观评估数据</td></tr>';
+  html+='<tr style="background:#805ad5;color:#fff;font-weight:bold;text-align:center">';
+  ['患者','主要症状','发病时间','诱因','触诊部位','压痛(0-10)','活动度','肌力','皮温(左/右)'].forEach(function(h){html+='<td>'+h+'</td>'});
+  html+='</tr>';
+  Object.keys(assessments).forEach(function(pid,idx){
+    var p=getPatient(pid);
+    var a=assessments[pid];
+    if(!a)return;
+    var cc=a.chiefComplaint||{};
+    var pal=a.palpation||{};
+    var skinT=a.skinTemp||{};
+    var romStr='';
+    if(a.rom&&a.rom.length){romStr=a.rom.map(function(r){return r.joint+':主'+(r.active||'-')+'/被'+(r.passive||'-')}).join('; ')}
+    var muscleStr='';
+    if(a.muscle&&a.muscle.length){muscleStr=a.muscle.map(function(m){return m.group+':'+m.grade+'级'}).join('; ')}
+    var bg=idx%2===0?'#ffffff':'#f7fafc';
+    html+='<tr style="background:'+bg+'">';
+    html+='<td>'+escapeHtml(p?p.name:pid)+'</td>';
+    html+='<td>'+escapeHtml(cc.symptoms||'-')+'</td>';
+    html+='<td>'+escapeHtml(cc.onset||'-')+'</td>';
+    html+='<td>'+escapeHtml(cc.triggers||'-')+'</td>';
+    html+='<td>'+(pal.sites?escapeHtml(pal.sites.join('、')):'-')+'</td>';
+    html+='<td>'+(pal.painLevel!=null?pal.painLevel:'-')+'</td>';
+    html+='<td>'+escapeHtml(romStr||'-')+'</td>';
+    html+='<td>'+escapeHtml(muscleStr||'-')+'</td>';
+    html+='<td>'+(skinT.left||'-')+'/'+(skinT.right||'-')+'</td>';
+    html+='</tr>';
+  });
+  html+='</table>';
+
+  // Sheet 4: 量表评估
+  html+='<p></p><table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">';
+  html+='<tr style="background:#d69e2e;color:#fff;font-weight:bold;text-align:center"><td colspan="6" style="font-size:14px">量表评估数据</td></tr>';
+  html+='<tr style="background:#d69e2e;color:#fff;font-weight:bold;text-align:center">';
+  ['患者','量表类型','得分','结论','测评时间','治疗师'].forEach(function(h){html+='<td>'+h+'</td>'});
+  html+='</tr>';
+  var scaleRowIdx=0;
+  Object.keys(scales).forEach(function(pid){
+    var p=getPatient(pid);
+    var sl=scales[pid];
+    if(!sl||!sl.length)return;
+    sl.forEach(function(s){
+      var bg=scaleRowIdx%2===0?'#ffffff':'#f7fafc';scaleRowIdx++;
+      html+='<tr style="background:'+bg+'">';
+      html+='<td>'+escapeHtml(p?p.name:pid)+'</td>';
+      html+='<td>'+escapeHtml(s.scaleType||'-')+'</td>';
+      html+='<td>'+escapeHtml(s.score!=null?s.score:'-')+'</td>';
+      html+='<td>'+escapeHtml(s.conclusion||'-')+'</td>';
+      html+='<td>'+escapeHtml(fmtTime(s.date))+'</td>';
+      html+='<td>'+escapeHtml(t.name||'-')+'</td>';
+      html+='</tr>';
+    });
+  });
+  html+='</table>';
+
+  // Sheet 5: 康复方案
+  html+='<p></p><table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">';
+  html+='<tr style="background:#e53e3e;color:#fff;font-weight:bold;text-align:center"><td colspan="7" style="font-size:14px">康复方案数据</td></tr>';
+  html+='<tr style="background:#e53e3e;color:#fff;font-weight:bold;text-align:center">';
+  ['患者','阶段','治疗目标','治疗频率','治疗项目','参数','注意事项'].forEach(function(h){html+='<td>'+h+'</td>'});
+  html+='</tr>';
+  var planRowIdx=0;
+  Object.keys(plans).forEach(function(pid){
+    var p=getPatient(pid);
+    var plan=plans[pid];
+    if(!plan)return;
+    PLAN_STAGES.forEach(function(ps){
+      var st=plan[ps.key];
+      if(!st)return;
+      var items=st.items||[];
+      if(items.length===0){
+        var bg=planRowIdx%2===0?'#ffffff':'#f7fafc';planRowIdx++;
+        html+='<tr style="background:'+bg+'">';
+        html+='<td>'+escapeHtml(p?p.name:pid)+'</td>';
+        html+='<td>'+escapeHtml(ps.name)+'</td>';
+        html+='<td>'+escapeHtml(st.goal||'-')+'</td>';
+        html+='<td>'+escapeHtml(st.freq||'-')+'</td>';
+        html+='<td>-</td><td>-</td>';
+        html+='<td>'+escapeHtml(st.notes||'-')+'</td>';
+        html+='</tr>';
+      }else{
+        items.forEach(function(it){
+          var bg=planRowIdx%2===0?'#ffffff':'#f7fafc';planRowIdx++;
+          html+='<tr style="background:'+bg+'">';
+          html+='<td>'+escapeHtml(p?p.name:pid)+'</td>';
+          html+='<td>'+escapeHtml(ps.name)+'</td>';
+          html+='<td>'+escapeHtml(st.goal||'-')+'</td>';
+          html+='<td>'+escapeHtml(st.freq||'-')+'</td>';
+          html+='<td>'+escapeHtml(it.name)+'</td>';
+          html+='<td>'+escapeHtml(it.params||'-')+'</td>';
+          html+='<td>'+escapeHtml(st.notes||'-')+'</td>';
+          html+='</tr>';
+        });
+      }
+    });
+  });
+  html+='</table>';
+
+  // Sheet 6: 特殊检查
+  html+='<p></p><table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">';
+  html+='<tr style="background:#319795;color:#fff;font-weight:bold;text-align:center"><td colspan="5" style="font-size:14px">特殊检查数据</td></tr>';
+  html+='<tr style="background:#319795;color:#fff;font-weight:bold;text-align:center">';
+  ['患者','检查项目','结果','备注','检查时间'].forEach(function(h){html+='<td>'+h+'</td>'});
+  html+='</tr>';
+  var examRowIdx=0;
+  Object.keys(specialExams).forEach(function(pid){
+    var p=getPatient(pid);
+    var el=specialExams[pid];
+    if(!el||!el.length)return;
+    el.forEach(function(e){
+      var bg=examRowIdx%2===0?'#ffffff':'#f7fafc';examRowIdx++;
+      var resultMap={positive:'阳性',negative:'阴性',suspect:'可疑',unchecked:'未查'};
+      html+='<tr style="background:'+bg+'">';
+      html+='<td>'+escapeHtml(p?p.name:pid)+'</td>';
+      html+='<td>'+escapeHtml(e.name||'-')+'</td>';
+      html+='<td>'+(resultMap[e.result]||e.result||'-')+'</td>';
+      html+='<td>'+escapeHtml(e.note||'-')+'</td>';
+      html+='<td>'+escapeHtml(fmtTime(e.date))+'</td>';
+      html+='</tr>';
+    });
+  });
+  html+='</table>';
+
+  // Summary
+  html+='<p></p><table border="1" cellspacing="0" cellpadding="5" style="font-family:sans-serif;font-size:12px;border-collapse:collapse">';
+  html+='<tr style="background:#2d3748;color:#fff;font-weight:bold;text-align:center"><td colspan="2" style="font-size:14px">数据统计汇总</td></tr>';
+  html+='<tr><td>导出时间</td><td>'+escapeHtml(fmtTime(Date.now()))+'</td></tr>';
+  html+='<tr><td>治疗师</td><td>'+escapeHtml(t.name||'-')+' ('+escapeHtml(t.department||'')+')'+'</td></tr>';
+  html+='<tr><td>患者总数</td><td>'+patients.length+' 人</td></tr>';
+  html+='<tr><td>拍照记录总数</td><td>'+records.length+' 条</td></tr>';
+  html+='<tr><td>评估记录总数</td><td>'+Object.keys(assessments).length+' 份</td></tr>';
+  html+='<tr><td>量表评估总数</td><td>'+Object.keys(scales).reduce(function(s,k){return s+(scales[k]?scales[k].length:0)},0)+' 条</td></tr>';
+  html+='<tr><td>康复方案总数</td><td>'+Object.keys(plans).length+' 份</td></tr>';
+  html+='<tr><td>特殊检查总数</td><td>'+Object.keys(specialExams).reduce(function(s,k){return s+(specialExams[k]?specialExams[k].length:0)},0)+' 条</td></tr>';
+  html+='</table>';
+
+  html+='</body></html>';
   var blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel'});
   var url=URL.createObjectURL(blob);
   var a=document.createElement('a');
-  a.href=url;a.download='治疗记录_'+todayStr()+'.xls';
+  a.href=url;a.download='康复评估全数据_'+todayStr()+'.xls';
   document.body.appendChild(a);a.click();a.remove();
   setTimeout(function(){URL.revokeObjectURL(url)},1000);
-  toast('Excel已下载');
+  toast('Excel全数据已下载（'+patients.length+'患者/'+records.length+'记录/'+Object.keys(assessments).length+'评估）');
 }
 
 /* ==================== Full backup / import / single-patient export ==================== */
@@ -2135,6 +2371,16 @@ routes['/assessment/:id']=function(id){
   app.innerHTML='<div class="page no-print">'+
     '<div class="page-header"><h2>主诉与客观评估</h2><p>'+escapeHtml(p.name)+' · '+(p.diagnosis||'未诊断')+'</p></div>'+
 
+    '<div class="card" style="margin-bottom:10px"><div class="form-group" style="margin:0"><label>选择评估项（点击展开/收起）</label><select id="as_section_sel">'+
+    '<option value="all">全部展示</option>'+
+    '<option value="as_cc">主诉</option>'+
+    '<option value="as_pal">触诊</option>'+
+    '<option value="as_rom">活动度 (ROM)</option>'+
+    '<option value="as_muscle">肌力评估</option>'+
+    '<option value="as_skin">皮温</option>'+
+    '<option value="as_adl">ADL 日常生活活动</option>'+
+    '</select></div></div>'+
+
     '<div class="section-card" id="as_cc"><div class="sc-hd"><span>主诉</span><span class="arrow">▾</span></div><div class="sc-bd">'+
       '<div class="form-group"><label>主要症状</label><textarea id="as_symptoms" placeholder="主要症状描述">'+escapeHtml(cc.symptoms)+'</textarea></div>'+
       '<div class="form-group"><label>发病时间</label><input id="as_onset" value="'+escapeHtml(cc.onset)+'" placeholder="如：3天前/2周前"></div>'+
@@ -2177,6 +2423,22 @@ routes['/assessment/:id']=function(id){
   document.querySelectorAll('.section-card .sc-hd').forEach(function(hd){
     hd.onclick=function(){hd.parentElement.classList.toggle('collapsed')};
   });
+  // section selector dropdown
+  var sectionSel=document.getElementById('as_section_sel');
+  if(sectionSel){
+    sectionSel.onchange=function(){
+      var val=this.value;
+      var sections=document.querySelectorAll('.section-card');
+      if(val==='all'){
+        sections.forEach(function(s){s.style.display='';s.classList.remove('collapsed')});
+      }else{
+        sections.forEach(function(s){
+          if(s.id===val){s.style.display='';s.classList.remove('collapsed')}
+          else{s.style.display='none'}
+        });
+      }
+    };
+  }
   // palpation pills
   var palSites=pal.sites.slice();
   document.querySelectorAll('#pal_sites .pill').forEach(function(el){
@@ -2726,7 +2988,7 @@ routes['/plan/:id']=function(id){
         '<input data-plan-freqc="'+ps.key+'" value="'+escapeHtml(st.freqCustom||'')+'" placeholder="自定义频率" style="margin-top:6px"></div>'+
       '<div><label style="font-size:13px;color:#555;display:block;margin-bottom:6px">治疗项目</label><div id="items_'+ps.key+'">'+renderStage(ps.key)+'</div></div>'+
       '<div class="form-group" style="margin-top:8px"><label>添加治疗项目</label>'+
-        '<select id="addcat_'+ps.key+'">'+Object.keys(TREATMENT_ITEMS).map(function(c){return '<option value="'+c+'">'+c+'</option>'}).join('')+'</select>'+
+        '<select id="addcat_'+ps.key+'">'+getDYCategories().map(function(c){return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>'}).join('')+'</select>'+
         '<select id="additem_'+ps.key+'" style="margin-top:6px"></select>'+
         '<div class="form-group" style="margin-top:6px"><label>参数/详情</label><input id="addparams_'+ps.key+'" placeholder="如：参数/组数/次数/时长/部位/负荷"></div>'+
         '<button class="btn btn-ghost" id="addbtn_'+ps.key+'" style="margin-top:6px">+ 添加到本阶段</button>'+
@@ -2754,7 +3016,7 @@ routes['/plan/:id']=function(id){
     var paramsInput=document.getElementById('addparams_'+ps.key);
     function refreshItems(){
       var cat=catSel.value;
-      var items=TREATMENT_ITEMS[cat];
+      var items=getDYItemsByCategory(cat);
       itemSel.innerHTML=items.map(function(it){return '<option value="'+escapeHtml(it.name)+'" data-vid="'+escapeHtml(it.video||'')+'" data-unit="'+escapeHtml(it.unit||'')+'">'+escapeHtml(it.name)+(it.unit?'（'+escapeHtml(it.unit)+'）':'')+'</option>'}).join('');
       updateParamsPlaceholder();
     }
@@ -2829,16 +3091,18 @@ routes['/plan/:id']=function(id){
     // acute: pain>7 -> physical factors
     if(maxPain>7){
       existing.acute.goal='控制疼痛、减轻炎症';
-      existing.acute.items.push({name:'电疗(TENS/干扰电)',category:'物理因子治疗',params:'镇痛模式',video:TREATMENT_ITEMS['物理因子治疗'][0].video});
-      existing.acute.items.push({name:'冷疗',category:'物理因子治疗',params:'15分钟',video:''});
+      var dyTens=findDYPrice('电疗');
+      existing.acute.items.push({name:dyTens?dyTens.name:'运动功能训练',category:dyTens?dyTens.category:'康复训练',params:'镇痛模式',video:''});
     }
     if(minGrade<3){
       existing.subacute.goal='增强肌力';
-      existing.subacute.items.push({name:'肌力训练',category:'运动疗法',params:'低负荷 '+minGrade+'级肌力训练',video:''});
+      var dyMuscle=findDYPrice('运动功能训练');
+      existing.subacute.items.push({name:dyMuscle?dyMuscle.name:'运动功能训练',category:dyMuscle?dyMuscle.category:'康复训练',params:'低负荷 '+minGrade+'级肌力训练',video:''});
     }
     if(existing.chronic.items.length===0){
       existing.chronic.goal='功能恢复与巩固';
-      existing.chronic.items.push({name:'核心训练',category:'运动疗法',params:'循序渐进',video:''});
+      var dyCore=findDYPrice('运动功能训练');
+      existing.chronic.items.push({name:dyCore?dyCore.name:'运动功能训练',category:dyCore?dyCore.category:'康复训练',params:'循序渐进',video:''});
     }
     PLAN_STAGES.forEach(function(ps){document.getElementById('items_'+ps.key).innerHTML=renderStage(ps.key)});
     bindItemRm();
