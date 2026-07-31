@@ -790,7 +790,44 @@ function confirmDialog(msg,cb){
   mask.onclick=function(e){if(e.target===mask)mask.remove()};
 }
 
-/* ========================= Simple QR Code (pure JS) ========================= */
+/* ========================= Share Modal ========================= */
+function showShareModal(title,text,key){
+  var mask=document.createElement('div');
+  mask.className='modal-mask';
+  var html='<div class="modal" style="max-width:380px">'+
+    '<div class="modal-hd" style="padding:14px 16px;border-bottom:1px solid #edf2f7;font-size:15px;font-weight:600">'+escapeHtml(title)+'</div>'+
+    '<div class="modal-bd" style="padding:16px">'+
+    '<div style="text-align:center;margin-bottom:12px">'+
+      '<canvas id="share_qr" width="160" height="160" style="border:1px solid #e2e8f0;border-radius:8px"></canvas>'+
+      '<div style="font-size:11px;color:#999;margin-top:4px">扫码或复制文本分享</div>'+
+    '</div>'+
+    '<textarea id="share_text" style="width:100%;height:180px;font-size:12px;border:1px solid #e2e8f0;border-radius:6px;padding:8px;resize:none;box-sizing:border-box" readonly>'+escapeHtml(text)+'</textarea>'+
+    '</div>'+
+    '<div class="modal-ft" style="display:flex;gap:8px;padding:12px 16px">'+
+      '<button class="btn btn-ghost" id="share_close" style="flex:1">关闭</button>'+
+      '<button class="btn" id="share_copy" style="flex:1">📋 复制文本</button>'+
+    '</div></div>';
+  mask.innerHTML=html;
+  document.body.appendChild(mask);
+  // draw QR
+  var qrCanvas=mask.querySelector('#share_qr');
+  if(qrCanvas)drawQR(qrCanvas,text);
+  mask.querySelector('#share_close').onclick=function(){mask.remove()};
+  mask.querySelector('#share_copy').onclick=function(){
+    var ta=mask.querySelector('#share_text');
+    try{
+      ta.select();
+      document.execCommand('copy');
+      toast('已复制到剪贴板');
+    }catch(e){
+      // fallback for mobile
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){toast('已复制')}).catch(function(){toast('复制失败，请手动选择文本')});
+      }else{toast('请手动选择文本复制')}
+    }
+  };
+  mask.onclick=function(e){if(e.target===mask)mask.remove()};
+}
 /* Simplified QR-like generator: 3 finder patterns + timing + deterministic data modules from hash */
 function drawQR(canvas,text){
   var size=25; // 25x25 modules
@@ -1090,6 +1127,7 @@ routes['/patients']=function(param,query){
   }
   app.innerHTML='<div class="page"><div class="page-header"><h2>患者管理</h2><p>共 '+patients.length+' 位患者 '+roleBadge+'</p></div>'+
     '<div class="search-box"><span class="ic">🔍</span><input id="pat_search" placeholder="按姓名或患者ID搜索"></div>'+
+    '<div class="card" style="padding:10px;margin-bottom:10px"><div style="font-size:13px;font-weight:600;margin-bottom:6px">📋 按患者ID直接加载</div><div style="display:flex;gap:8px"><input id="pat_id_input" placeholder="输入患者ID（如P-20250731-AB12）" style="flex:1;padding:8px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px"><button class="btn" id="pat_id_load" style="white-space:nowrap">加载</button></div></div>'+
     '<div class="card"><div class="card-title">患者列表 <button class="btn-mini" id="addPatient">+ 新增</button></div>'+list+'</div></div>';
 
   document.getElementById('addPatient').onclick=function(){showPatientForm(null)};
@@ -1109,6 +1147,24 @@ routes['/patients']=function(param,query){
         el.style.display=match?'':'none';
       });
     };
+  }
+  // load by patient ID
+  var idLoadBtn=document.getElementById('pat_id_load');
+  var idInput=document.getElementById('pat_id_input');
+  if(idLoadBtn&&idInput){
+    function loadByPatientId(){
+      var pid=(idInput.value||'').trim();
+      if(!pid){toast('请输入患者ID');return}
+      var matched=null;
+      var allP=getPatients();
+      for(var i=0;i<allP.length;i++){
+        if(allP[i].patientId===pid||allP[i].patientId.toUpperCase()===pid.toUpperCase()){matched=allP[i];break}
+      }
+      if(!matched){toast('未找到患者ID：'+pid);return}
+      go('/patient/'+matched.id);
+    }
+    idLoadBtn.onclick=loadByPatientId;
+    idInput.onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();loadByPatientId()}};
   }
   var edits=document.querySelectorAll('[data-edit]');
   for(var i=0;i<edits.length;i++){(function(el){el.onclick=function(e){e.stopPropagation();showPatientForm(el.getAttribute('data-edit'))}})(edits[i])}
@@ -2685,7 +2741,10 @@ routes['/plan/:id']=function(id){
     '<button class="btn btn-ghost" id="plan_recommend" style="margin-bottom:12px">🤖 根据评估推荐方案</button>'+
     stagesHtml+
     '<button class="btn" id="plan_save">💾 保存方案</button>'+
-    '<button class="btn btn-ghost" data-go="/patient/'+id+'" style="margin-top:8px">返回患者详情</button>'+
+    '<div style="display:flex;gap:8px;margin-top:8px">'+
+    '<button class="btn btn-ghost" id="plan_share" style="flex:1">📤 分享方案</button>'+
+    '<button class="btn btn-ghost" data-go="/patient/'+id+'" style="flex:1">返回患者详情</button>'+
+    '</div>'+
     '</div>';
 
   // populate item options based on category
@@ -2790,6 +2849,41 @@ routes['/plan/:id']=function(id){
   document.getElementById('plan_save').onclick=function(){
     setPlan(id,existing);
     toast('方案已保存');
+  };
+
+  // share plan
+  document.getElementById('plan_share').onclick=function(){
+    var t=getTherapist();
+    var text='【康复方案分享】\n患者：'+(p.name||'-')+'　'+(p.gender||'')+'　'+(p.age||'')+'岁\n';
+    if(p.diagnosis)text+='诊断：'+p.diagnosis+'\n';
+    text+='治疗师：'+(t.name||'-')+'　'+(t.department||'')+'\n';
+    text+='生成时间：'+fmtTime(Date.now())+'\n';
+    text+='─────────────\n';
+    PLAN_STAGES.forEach(function(ps){
+      var st=existing[ps.key];
+      if(!st)return;
+      text+='\n【'+ps.name+'】\n';
+      if(st.goal)text+='目标：'+st.goal+'\n';
+      if(st.freq)text+='频率：'+st.freq+'\n';
+      if(st.items&&st.items.length){
+        text+='治疗项目：\n';
+        st.items.forEach(function(it,idx){
+          var line='  '+(idx+1)+'. '+it.name+'（'+it.category+'）';
+          var meta=[];
+          if(it.params)meta.push(it.params);
+          if(it.dur)meta.push(it.dur);
+          if(it.freq)meta.push(it.freq);
+          if(it.sets)meta.push(it.sets+'组');
+          if(it.reps)meta.push(it.reps+'次');
+          if(it.part)meta.push('部位：'+it.part);
+          if(meta.length)line+=' ['+meta.join('，')+']';
+          text+=line+'\n';
+        });
+      }
+      if(st.notes)text+='注意事项：'+st.notes+'\n';
+    });
+    text+='─────────────\n（由康复评估系统生成）';
+    showShareModal('康复方案分享',text,'plan_'+id);
   };
 };
 
@@ -2919,8 +3013,9 @@ routes['/report/:id']=function(id){
   app.innerHTML='<div class="page">'+
     '<div class="page-header no-print"><h2>康复评估报告</h2><p>'+escapeHtml(p.name)+'</p></div>'+
     '<div class="no-print" style="display:flex;gap:8px;margin-bottom:12px">'+
-      '<button class="btn" id="rp_print" style="flex:1">🖨 导出PDF</button>'+
-      '<button class="btn btn-ghost" id="rp_view" style="flex:1">👁 在线预览</button>'+
+    '<button class="btn" id="rp_print" style="flex:1">🖨 导出PDF</button>'+
+    '<button class="btn btn-ghost" id="rp_view" style="flex:1">👁 在线预览</button>'+
+    '<button class="btn btn-ghost" id="rp_share" style="flex:1">📤 分享</button>'+
     '</div>'+
     '<div class="no-print" style="display:flex;gap:8px;margin-bottom:12px">'+
       '<button class="btn btn-ghost" data-go="/assessment/'+id+'" style="flex:1">修改评估</button>'+
@@ -2939,6 +3034,52 @@ routes['/report/:id']=function(id){
     if(content.style.maxHeight==='none'){content.style.maxHeight='none';toast('已展开完整报告')}
     else{content.style.maxHeight='none';content.scrollIntoView({behavior:'smooth'})}
     toast('完整报告已展示');
+  };
+  // share report
+  document.getElementById('rp_share').onclick=function(){
+    var text='【康复评估报告】\n';
+    text+='患者：'+(p.name||'-')+'　'+(p.gender||'')+'　'+(p.age||'')+'岁\n';
+    if(p.patientId)text+='患者ID：'+p.patientId+'\n';
+    if(p.diagnosis)text+='诊断：'+p.diagnosis+'\n';
+    text+='治疗师：'+(t.name||'-')+'　'+(t.department||'')+'\n';
+    text+='报告时间：'+fmtTime(Date.now())+'\n';
+    text+='═══════════════\n';
+    // 主诉
+    if(asm){
+      text+='\n【主诉】\n';
+      if(asm.symptoms)text+='主要症状：'+asm.symptoms+'\n';
+      if(asm.onset)text+='发病时间：'+asm.onset+'\n';
+      if(asm.triggers)text+='诱因：'+asm.triggers+'\n';
+    }
+    // 客观评估
+    if(asm){
+      text+='\n【客观评估】\n';
+      if(asm.palpation&&(asm.palpation.sites&&asm.palpation.sites.length))text+='触诊疼痛部位：'+asm.palpation.sites.join('、')+'\n';
+      if(asm.palpation&&asm.palpation.pain!=null)text+='压痛程度：'+asm.palpation.pain+'/10分\n';
+      if(asm.rom&&asm.rom.length){text+='活动度：';asm.rom.forEach(function(r){text+=r.joint+'(主'+r.active+'°/被'+r.passive+'°) '});text+='\n'}
+      if(asm.muscle&&asm.muscle.length){text+='肌力：';asm.muscle.forEach(function(m){text+=m.group+':'+m.grade+'级 '});text+='\n'}
+      if(asm.skin&&(asm.skin.left||asm.skin.right))text+='皮温：左'+(asm.skin.left||'-')+'℃ 右'+(asm.skin.right||'-')+'℃\n';
+      if(asm.adl){text+='ADL总分：'+(asm.adl.total!=null?asm.adl.total:'-')+'分\n'}
+    }
+    // 量表
+    if(scales&&scales.length){
+      text+='\n【量表评估】\n';
+      scales.forEach(function(s){text+=s.type+': '+s.score+'分（'+(s.conclusion||'')+'）\n'});
+    }
+    // 方案
+    if(plan){
+      text+='\n【康复方案】\n';
+      PLAN_STAGES.forEach(function(ps){
+        var st=plan[ps.key];
+        if(!st)return;
+        text+='\n['+ps.name+']\n';
+        if(st.goal)text+='目标：'+st.goal+'\n';
+        if(st.freq)text+='频率：'+st.freq+'\n';
+        if(st.items&&st.items.length){text+='项目：';st.items.forEach(function(it,idx){text+=(idx+1)+'.'+it.name+' '});text+='\n'}
+      });
+    }
+    text+='\n═══════════════\n（由康复评估系统生成）';
+    showShareModal('报告分享',text,'report_'+id);
   };
 };
 
