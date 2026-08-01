@@ -852,24 +852,18 @@ function confirmDialog(msg,cb){
 function showShareModal(title,text,key){
   var mask=document.createElement('div');
   mask.className='modal-mask';
-  var html='<div class="modal" style="max-width:380px">'+
+  var html='<div class="modal" style="max-width:380px;max-height:85vh;overflow-y:auto">'+
     '<div class="modal-hd" style="padding:14px 16px;border-bottom:1px solid #edf2f7;font-size:15px;font-weight:600">'+escapeHtml(title)+'</div>'+
     '<div class="modal-bd" style="padding:16px">'+
-    '<div style="text-align:center;margin-bottom:12px">'+
-      '<canvas id="share_qr" width="160" height="160" style="border:1px solid #e2e8f0;border-radius:8px"></canvas>'+
-      '<div style="font-size:11px;color:#999;margin-top:4px">扫码或复制文本分享</div>'+
-    '</div>'+
-    '<textarea id="share_text" style="width:100%;height:180px;font-size:12px;border:1px solid #e2e8f0;border-radius:6px;padding:8px;resize:none;box-sizing:border-box" readonly>'+escapeHtml(text)+'</textarea>'+
+    '<textarea id="share_text" style="width:100%;height:240px;font-size:12px;border:1px solid #e2e8f0;border-radius:6px;padding:8px;resize:none;box-sizing:border-box" readonly>'+escapeHtml(text)+'</textarea>'+
     '</div>'+
     '<div class="modal-ft" style="display:flex;gap:8px;padding:12px 16px">'+
       '<button class="btn btn-ghost" id="share_close" style="flex:1">关闭</button>'+
-      '<button class="btn" id="share_copy" style="flex:1">📋 复制文本</button>'+
+      '<button class="btn" id="share_copy" style="flex:1">📋 复制</button>'+
+      '<button class="btn" id="share_img" style="flex:1;background:#38a169">🖼️ 导出图片</button>'+
     '</div></div>';
   mask.innerHTML=html;
   document.body.appendChild(mask);
-  // draw QR
-  var qrCanvas=mask.querySelector('#share_qr');
-  if(qrCanvas)drawQR(qrCanvas,text);
   mask.querySelector('#share_close').onclick=function(){mask.remove()};
   mask.querySelector('#share_copy').onclick=function(){
     var ta=mask.querySelector('#share_text');
@@ -878,51 +872,63 @@ function showShareModal(title,text,key){
       document.execCommand('copy');
       toast('已复制到剪贴板');
     }catch(e){
-      // fallback for mobile
       if(navigator.clipboard&&navigator.clipboard.writeText){
-        navigator.clipboard.writeText(text).then(function(){toast('已复制')}).catch(function(){toast('复制失败，请手动选择文本')});
+        navigator.clipboard.writeText(text).then(function(){toast('已复制')}).catch(function(){toast('复制失败，请手动选择')});
       }else{toast('请手动选择文本复制')}
     }
   };
+  mask.querySelector('#share_img').onclick=function(){
+    // render text to canvas image
+    var lines=text.split('\n');
+    var canvas=document.createElement('canvas');
+    var ctx=canvas.getContext('2d');
+    var fontSize=14;
+    var lineH=20;
+    var padX=30,padY=30;
+    var maxWidth=0;
+    ctx.font=fontSize+'px sans-serif';
+    lines.forEach(function(line){
+      var w=ctx.measureText(line).width;
+      if(w>maxWidth)maxWidth=w;
+    });
+    canvas.width=Math.ceil(maxWidth)+padX*2;
+    canvas.height=lines.length*lineH+padY*2+40;
+    // background
+    ctx.fillStyle='#fff';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    // title bar
+    ctx.fillStyle='#3182ce';
+    ctx.fillRect(0,0,canvas.width,36);
+    ctx.fillStyle='#fff';
+    ctx.font='bold 16px sans-serif';
+    ctx.fillText(title,padX,24);
+    // text
+    ctx.fillStyle='#333';
+    ctx.font=fontSize+'px sans-serif';
+    var y=padY+36;
+    lines.forEach(function(line){
+      ctx.fillText(line,padX,y);
+      y+=lineH;
+    });
+    // footer
+    ctx.fillStyle='#999';
+    ctx.font='11px sans-serif';
+    ctx.fillText('生成时间: '+fmtTime(Date.now()),padX,y+10);
+    // download
+    canvas.toBlob(function(blob){
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url;
+      a.download=title.replace(/[\s\/]/g,'_')+'_'+todayStr()+'.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function(){URL.revokeObjectURL(url)},1000);
+      toast('图片已保存到手机');
+      mask.remove();
+    },'image/png');
+  };
   mask.onclick=function(e){if(e.target===mask)mask.remove()};
-}
-/* Simplified QR-like generator: 3 finder patterns + timing + deterministic data modules from hash */
-function drawQR(canvas,text){
-  var size=25; // 25x25 modules
-  var ctx=canvas.getContext('2d');
-  var px=canvas.width/size;
-  var grid=[];
-  for(var i=0;i<size;i++){grid[i]=[];for(var j=0;j<size;j++){grid[i][j]=0}}
-  // 7x7 finder pattern at center (r,c): outer ring on, inner 3x3 filled, middle gap off
-  function finder(r,c){
-    for(var y=-3;y<=3;y++){for(var x=-3;x<=3;x++){
-      var yy=r+y,xx=c+x;
-      if(yy<0||yy>=size||xx<0||xx>=size)continue;
-      var ay=Math.abs(y),ax=Math.abs(x);
-      var on=(ay===3||ax===3)||(ay<=1&&ax<=1);
-      if(on)grid[yy][xx]=1;
-    }}
-  }
-  finder(3,3);
-  finder(3,size-4);
-  finder(size-4,3);
-  // timing patterns (alternating)
-  for(var t=8;t<size-8;t++){grid[6][t]=t%2===0?1:0;grid[t][6]=t%2===0?1:0}
-  // data modules derived deterministically from hash via LCG
-  var h=simpleHash(text);
-  var seed=parseInt(h.slice(0,8),16)||12345;
-  for(var row=0;row<size;row++){
-    for(var col=0;col<size;col++){
-      if((row<8&&col<8)||(row<8&&col>=size-8)||(row>=size-8&&col<8))continue; // skip finder zones
-      if(row===6||col===6)continue; // skip timing
-      seed=(seed*1103515245+12345)&0x7fffffff;
-      grid[row][col]=(seed>>16)&1;
-    }
-  }
-  // render
-  ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='#000';
-  for(var r2=0;r2<size;r2++){for(var c2=0;c2<size;c2++){if(grid[r2][c2]){ctx.fillRect(c2*px,r2*px,px,px)}}}
 }
 
 /* ========================= Watermark ========================= */
@@ -1020,6 +1026,17 @@ function route(path){
   renderTabbar(key);
   var param=parts[1]?decodeURIComponent(parts[1]):null;
   fn(param,query);
+  // add back button to sub-pages
+  var hdr=document.querySelector('.page-header');
+  if(hdr && parts[1]){
+    var backBtn=document.createElement('div');
+    backBtn.style.cssText='position:absolute;top:14px;left:10px;font-size:18px;cursor:pointer;color:#fff;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,.2)';
+    backBtn.innerHTML='‹';
+    backBtn.onclick=function(){history.back()};
+    hdr.style.position='relative';
+    hdr.style.paddingLeft='48px';
+    hdr.appendChild(backBtn);
+  }
   // generic in-page navigation links (more / all / quick links)
   var goLinks=document.querySelectorAll('#app [data-go]');
   for(var m=0;m<goLinks.length;m++){
@@ -2429,8 +2446,8 @@ routes['/assessment/:id']=function(id){
   app.innerHTML='<div class="page no-print">'+
     '<div class="page-header"><h2>主诉与客观评估</h2><p>'+escapeHtml(p.name)+' · '+(p.diagnosis||'未诊断')+'</p></div>'+
 
-    '<div class="card" style="margin-bottom:10px"><div class="form-group" style="margin:0"><label>选择评估项（点击展开/收起）</label><select id="as_section_sel">'+
-    '<option value="all">全部展示</option>'+
+    '<div class="card" style="margin-bottom:10px"><div class="form-group" style="margin:0"><label>选择需要填写的评估项</label><select id="as_section_sel">'+
+    '<option value="">请选择评估项...</option>'+
     '<option value="as_cc">主诉</option>'+
     '<option value="as_pal">触诊</option>'+
     '<option value="as_rom">活动度 (ROM)</option>'+
@@ -2477,24 +2494,18 @@ routes['/assessment/:id']=function(id){
     '<button class="btn btn-ghost" data-go="/patient/'+id+'" style="margin-top:8px">返回患者详情</button>'+
     '</div>';
 
-  // collapsible sections
-  document.querySelectorAll('.section-card .sc-hd').forEach(function(hd){
-    hd.onclick=function(){hd.parentElement.classList.toggle('collapsed')};
-  });
-  // section selector dropdown
+  // hide all sections by default
+  document.querySelectorAll('.section-card').forEach(function(s){s.style.display='none';s.classList.add('collapsed')});
+  // section selector - only show selected
   var sectionSel=document.getElementById('as_section_sel');
   if(sectionSel){
     sectionSel.onchange=function(){
       var val=this.value;
       var sections=document.querySelectorAll('.section-card');
-      if(val==='all'){
-        sections.forEach(function(s){s.style.display='';s.classList.remove('collapsed')});
-      }else{
-        sections.forEach(function(s){
-          if(s.id===val){s.style.display='';s.classList.remove('collapsed')}
-          else{s.style.display='none'}
-        });
-      }
+      sections.forEach(function(s){
+        if(s.id===val){s.style.display='';s.classList.remove('collapsed')}
+        else{s.style.display='none'}
+      });
     };
   }
   // palpation pills
