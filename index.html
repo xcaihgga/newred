@@ -484,9 +484,9 @@ DB.init().catch(function(err){
 
 /* ========================= Data Accessors ========================= */
 function getProfiles(){return LS.get('therapist_profiles')||[]}
-function setProfiles(p){LS.set('therapist_profiles',p)}
+function setProfiles(p){return LS.set('therapist_profiles',p)}
 function getActiveProfileId(){return LS.get('active_profile_id')||''}
-function setActiveProfileId(id){LS.set('active_profile_id',id)}
+function setActiveProfileId(id){return LS.set('active_profile_id',id)}
 function getActiveProfile(){
   var profiles=getProfiles();
   if(profiles.length===0)return null;
@@ -501,17 +501,17 @@ function setTherapist(t){
   var profiles=getProfiles();
   if(profiles.length===0){
     profiles=[{id:uid(),name:t.name,department:t.department,role:''}];
-    setProfiles(profiles);
-    setActiveProfileId(profiles[0].id);
+    if(!setProfiles(profiles))return false;
+    return setActiveProfileId(profiles[0].id);
   }else{
     profiles[0].name=t.name;profiles[0].department=t.department;
-    setProfiles(profiles);
+    return setProfiles(profiles);
   }
 }
 function getPatients(){return LS.get('patients')||[]}
-function setPatients(p){LS.set('patients',p)}
+function setPatients(p){return LS.set('patients',p)}
 function getRecords(){return LS.get('records')||[]}
-function setRecords(r){LS.set('records',r)}
+function setRecords(r){return LS.set('records',r)}
 function getRecord(id){var rs=getRecords();for(var i=0;i<rs.length;i++){if(rs[i].id===id)return rs[i]}return null}
 
 var TREATMENT_TYPES=['物理治疗','中医','推拿','康复','针灸','其他'];
@@ -529,38 +529,38 @@ function genPatientId(){
 
 /* Assessments: {patientId: {chiefComplaint, palpation, rom, muscle, skinTemp, adl, updatedAt}} */
 function getAssessments(){return LS.get('assessments')||{}}
-function setAssessments(a){LS.set('assessments',a)}
+function setAssessments(a){return LS.set('assessments',a)}
 function getAssessment(pid){var a=getAssessments();return a[pid]||null}
-function setAssessment(pid,data){var a=getAssessments();data.updatedAt=Date.now();a[pid]=data;setAssessments(a)}
+function setAssessment(pid,data){var a=getAssessments();data.updatedAt=Date.now();a[pid]=data;return setAssessments(a)}
 
 /* Special exams: {patientId: [{examName, category, result, note, video, date}]} */
 function getSpecialExams(){return LS.get('specialExams')||{}}
-function setSpecialExams(s){LS.set('specialExams',s)}
+function setSpecialExams(s){return LS.set('specialExams',s)}
 function getSpecialExamList(pid){var s=getSpecialExams();return s[pid]||[]}
-function setSpecialExamList(pid,list){var s=getSpecialExams();s[pid]=list;setSpecialExams(s)}
+function setSpecialExamList(pid,list){var s=getSpecialExams();s[pid]=list;return setSpecialExams(s)}
 
 /* Scales: {patientId: [{scaleType, score, conclusion, data, date}]} */
 function getScales(){return LS.get('scales')||{}}
-function setScales(s){LS.set('scales',s)}
+function setScales(s){return LS.set('scales',s)}
 function getScaleList(pid){var s=getScales();return s[pid]||[]}
-function addScaleRecord(pid,rec){var s=getScales();if(!s[pid])s[pid]=[];s[pid].push(rec);setScales(s)}
-function clearScaleList(pid){var s=getScales();s[pid]=[];setScales(s)}
+function addScaleRecord(pid,rec){var s=getScales();if(!s[pid])s[pid]=[];s[pid].push(rec);return setScales(s)}
+function clearScaleList(pid){var s=getScales();s[pid]=[];return setScales(s)}
 
 /* Plans: {patientId: {acute, subacute, chronic, createdAt, updatedAt}} */
 function getPlans(){return LS.get('plans')||{}}
-function setPlans(p){LS.set('plans',p)}
+function setPlans(p){return LS.set('plans',p)}
 function getPlan(pid){var p=getPlans();return p[pid]||null}
-function setPlan(pid,plan){var p=getPlans();plan.updatedAt=Date.now();if(!plan.createdAt)plan.createdAt=Date.now();p[pid]=plan;setPlans(p)}
+function setPlan(pid,plan){var p=getPlans();plan.updatedAt=Date.now();if(!plan.createdAt)plan.createdAt=Date.now();p[pid]=plan;return setPlans(p)}
 
 /* Custom exam library & scale library & treatment items */
 function getCustomExams(){return LS.get('customExams')||[]}
-function setCustomExams(e){LS.set('customExams',e)}
+function setCustomExams(e){return LS.set('customExams',e)}
 function getCustomScales(){return LS.get('customScales')||[]}
-function setCustomScales(s){LS.set('customScales',s)}
+function setCustomScales(s){return LS.set('customScales',s)}
 
 /* User role: therapist / director / admin */
 function getUserRole(){return LS.get('userRole')||'therapist'}
-function setUserRole(r){LS.set('userRole',r)}
+function setUserRole(r){return LS.set('userRole',r)}
 function getRoleName(r){r=r||getUserRole();return {therapist:'治疗师',director:'主任',admin:'管理员'}[r]||'治疗师'}
 
 /* Permission check */
@@ -1132,16 +1132,38 @@ function route(path){
   }
   window.scrollTo(0,0);
 }
+// _navConfirmed: go() 已通过 dirty 检查，hashchange 无需再 confirm
+var _navConfirmed=false;
 function go(path){
-  if(location.hash!=='#'+path&&isDirty()&&!confirm(_dirtyMsg))return;
+  if(location.hash==='#'+path)return;
+  if(isDirty()&&!confirm(_dirtyMsg))return;
+  _navConfirmed=true;
+  clearDirty();
   location.hash='#'+path;
 }
 window.addEventListener('beforeunload',function(e){
   if(isDirty()){e.preventDefault();e.returnValue=_dirtyMsg;return _dirtyMsg}
 });
-window.addEventListener('hashchange',function(){
-  var h=location.hash.slice(1)||'/home';
-  route(h);
+window.addEventListener('hashchange',function(e){
+  // go() 发起的导航已通过 dirty 检查，直接渲染
+  if(_navConfirmed){
+    _navConfirmed=false;
+    var h=location.hash.slice(1)||'/home';
+    route(h);
+    return;
+  }
+  // 浏览器后退/前进：检查 dirty
+  if(isDirty()){
+    if(!confirm(_dirtyMsg)){
+      // 用户取消，恢复旧 URL（replaceState 不触发 hashchange）
+      var oldHash=e.oldURL&&e.oldURL.indexOf('#')>=0?e.oldURL.slice(e.oldURL.indexOf('#')):'#/home';
+      history.replaceState(null,'',oldHash);
+      return;
+    }
+    clearDirty();
+  }
+  var h2=location.hash.slice(1)||'/home';
+  route(h2);
 });
 
 /* ========================= Tabbar ========================= */
@@ -1385,7 +1407,7 @@ function showPatientForm(id){
       if(ap)newP.createdBy=ap.id;
       arr.push(newP);
     }
-    setPatients(arr);
+    if(!setPatients(arr)){toast('⚠️ 保存失败：存储空间不足');return}
     mask.remove();toast('已保存');route('/patients');
   };
   wrapSave('pf_save');
@@ -1652,16 +1674,29 @@ routes['/camera']=function(param,query){
     var doSave=function(){
       var c=pendingCapture;
       var rec={id:uid(),recordNo:c.rno,patientId:c.pid,patientName:c.pname,therapistName:c.th,treatmentType:c.type,location:c.loc,timestamp:c.ts,photoId:null};
-      // save blob to idb with id=rec.id
+      // 1. 先写记录（photoId=null 占位），LS 失败则直接报错，不产生孤儿照片
+      var rs=getRecords();
+      rs.push(rec);
+      if(!setRecords(rs)){
+        toast('⚠️ 保存失败：存储空间不足');
+        return Promise.resolve();
+      }
+      // 2. 再异步写照片到 IDB
       return DB.putPhoto(rec.id,c.blob).then(function(){
+        // 3. 照片成功，更新记录的 photoId
         rec.photoId=rec.id;
-        var rs=getRecords();
-        rs.push(rec);
-        setRecords(rs);
+        var rs2=getRecords();
+        for(var i=0;i<rs2.length;i++){if(rs2[i].id===rec.id){rs2[i].photoId=rec.id;break}}
+        setRecords(rs2);
         pendingCapture=null;
         toast('已保存记录');
         go('/record/'+rec.id);
-      }).catch(function(err){toast('保存失败：'+(err&&err.message||''));});
+      }).catch(function(err){
+        // 照片写入失败，但记录已保存（photoId=null），用户可重新拍照
+        pendingCapture=null;
+        toast('记录已保存，但照片存储失败：'+(err&&err.message||''));
+        go('/record/'+rec.id);
+      });
     };
     if(needUpdate&&pendingCapture.file){
       // regenerate then save
@@ -1975,7 +2010,7 @@ routes['/settings']=function(){
         ap.name=name;ap.department=dept;ap.role=roleIn;
         var arr=getProfiles();
         for(var i=0;i<arr.length;i++){if(arr[i].id===ap.id){arr[i]=ap;break}}
-        setProfiles(arr);
+        if(!setProfiles(arr)){toast('⚠️ 保存失败：存储空间不足');return}
       }
     }
     toast('已保存');route('/settings');
@@ -2141,7 +2176,7 @@ function showProfileForm(id){
       // if first profile, set as active
       if(arr.length===1){setActiveProfileId(np.id)}
     }
-    setProfiles(arr);
+    if(!setProfiles(arr)){toast('⚠️ 保存失败：存储空间不足');return}
     mask.remove();toast('已保存');route('/settings');
   };
   wrapSave('pf_id_save');
@@ -2456,14 +2491,27 @@ function importFullBackup(data){
   if(data.profiles){var pr=getProfiles();var pmap={};pr.forEach(function(p){if(isSafeKey(p.id))pmap[p.id]=p});data.profiles.forEach(function(p){if(p&&isSafeKey(p.id))pmap[p.id]=p});setProfiles(Object.keys(pmap).filter(isSafeKey).map(function(k){return pmap[k]}))}
   if(data.customExams){var ce=getCustomExams();data.customExams.forEach(function(e){var found=ce.some(function(x){return x.name===e.name&&x.category===e.category});if(!found)ce.push(e)});setCustomExams(ce)}
   if(data.customScales){var cs=getCustomScales();data.customScales.forEach(function(s){var found=cs.some(function(x){return x.name===s.name});if(!found)cs.push(s)});setCustomScales(cs)}
-  // import photos (async)
+  // import photos (async, race-safe via Promise.allSettled)
   if(data.photos&&data.photos.length){
-    var cnt=0;var tot=data.photos.length;
-    data.photos.forEach(function(ph){
-      if(!ph||!isSafeKey(ph.id)){cnt++;if(cnt===tot){toast('已导入照片（跳过非法ID）')};return}
-      var blob=dataURLToBlob(ph.dataURL);
-      DB.putPhoto(ph.id,blob).then(function(){cnt++;if(cnt===tot){toast('已导入'+tot+'张照片')}}).catch(function(){cnt++;if(cnt===tot){toast('已导入照片（部分失败）')}});
-    });
+    var valid=data.photos.filter(function(ph){return ph&&isSafeKey(ph.id)&&ph.dataURL});
+    var skipped=data.photos.length-valid.length;
+    if(valid.length>0){
+      toast('正在导入'+valid.length+'张照片...');
+      var promises=valid.map(function(ph){
+        var blob=dataURLToBlob(ph.dataURL);
+        return DB.putPhoto(ph.id,blob);
+      });
+      Promise.allSettled(promises).then(function(results){
+        var ok=0,fail=0;
+        results.forEach(function(r){if(r.status==='fulfilled')ok++;else fail++});
+        var msg='已导入'+ok+'张照片';
+        if(fail>0)msg+='（'+fail+'张失败）';
+        if(skipped>0)msg+='（跳过'+skipped+'张无效）';
+        toast(msg);
+      });
+    }else if(skipped>0){
+      toast('已导入数据（跳过'+skipped+'张无效照片）');
+    }
   }
 }
 
@@ -2762,7 +2810,7 @@ routes['/assessment/:id']=function(id){
       adl:{items:adlData}
     };
     clearDirty();
-    setAssessment(id,data);
+    if(!setAssessment(id,data)){toast('⚠️ 保存失败：存储空间不足');markDirty('form');return}
     toast('评估已保存');
   };
   wrapSave('as_save');
@@ -2840,7 +2888,7 @@ routes['/special-exam/:id']=function(id){
     if(!nm){toast('请输入名称');return}
     var arr=getCustomExams();
     arr.push({name:nm,category:ct,video:vd});
-    setCustomExams(arr);
+    if(!setCustomExams(arr)){toast('⚠️ 保存失败：存储空间不足');return}
     toast('已添加，请重新选择结果并保存');
     route('/special-exam/'+id);
   };
@@ -2858,7 +2906,7 @@ routes['/special-exam/:id']=function(id){
       }
     });
     clearDirty();
-    setSpecialExamList(id,list);
+    if(!setSpecialExamList(id,list)){toast('⚠️ 保存失败：存储空间不足');markDirty('form');return}
     toast('已保存 '+list.length+' 项检查结果');
   };
   wrapSave('se_save');
@@ -2961,7 +3009,7 @@ routes['/scales/:id']=function(id){
   };
   document.getElementById('sl_vas_save').onclick=function(){
     var s=+vas.value;
-    addScaleRecord(id,{scaleType:'VAS',score:s,conclusion:SCALE_DEFINITIONS.VAS.conclusion(s),data:{score:s},date:Date.now()});
+    if(!addScaleRecord(id,{scaleType:'VAS',score:s,conclusion:SCALE_DEFINITIONS.VAS.conclusion(s),data:{score:s},date:Date.now()})){toast('⚠️ 保存失败：存储空间不足');return}
     toast('VAS已保存');route('/scales/'+id);
   };
   wrapSave('sl_vas_save');
@@ -2977,7 +3025,7 @@ routes['/scales/:id']=function(id){
     };
   });
   document.getElementById('sl_nrs_save').onclick=function(){
-    addScaleRecord(id,{scaleType:'NRS',score:nrsVal,conclusion:SCALE_DEFINITIONS.NRS.conclusion(nrsVal),data:{score:nrsVal},date:Date.now()});
+    if(!addScaleRecord(id,{scaleType:'NRS',score:nrsVal,conclusion:SCALE_DEFINITIONS.NRS.conclusion(nrsVal),data:{score:nrsVal},date:Date.now()})){toast('⚠️ 保存失败：存储空间不足');return}
     toast('NRS已保存');route('/scales/'+id);
   };
   wrapSave('sl_nrs_save');
@@ -3033,7 +3081,7 @@ routes['/scales/:id']=function(id){
   document.getElementById('sl_mpq_save').onclick=function(){
     var data={sensory:mpqSens,affective:mpqAff,eval:mpqEval};
     var total=mpqSens.reduce(function(a,b){return a+b},0)+mpqAff.reduce(function(a,b){return a+b},0);
-    addScaleRecord(id,{scaleType:'MPQ',score:total,conclusion:SCALE_DEFINITIONS.MPQ.conclusion(data),data:data,date:Date.now()});
+    if(!addScaleRecord(id,{scaleType:'MPQ',score:total,conclusion:SCALE_DEFINITIONS.MPQ.conclusion(data),data:data,date:Date.now()})){toast('⚠️ 保存失败：存储空间不足');return}
     toast('MPQ已保存');route('/scales/'+id);
   };
   wrapSave('sl_mpq_save');
@@ -3062,7 +3110,7 @@ routes['/scales/:id']=function(id){
   renderBarthel();calcBar();
   document.getElementById('sl_bar_save').onclick=function(){
     var total=0;Object.keys(barthelData).forEach(function(k){total+=barthelData[k]});
-    addScaleRecord(id,{scaleType:'Barthel',score:total,conclusion:SCALE_DEFINITIONS.Barthel.conclusion(total),data:barthelData,date:Date.now()});
+    if(!addScaleRecord(id,{scaleType:'Barthel',score:total,conclusion:SCALE_DEFINITIONS.Barthel.conclusion(total),data:barthelData,date:Date.now()})){toast('⚠️ 保存失败：存储空间不足');return}
     toast('Barthel已保存');route('/scales/'+id);
   };
   wrapSave('sl_bar_save');
@@ -3076,7 +3124,7 @@ routes['/scales/:id']=function(id){
   document.getElementById('sl_walk_save').onclick=function(){
     var v=+walk.value;
     if(!v){toast('请输入距离');return}
-    addScaleRecord(id,{scaleType:'Walk6Min',score:v,conclusion:SCALE_DEFINITIONS.Walk6Min.conclusion(v),data:{distance:v},date:Date.now()});
+    if(!addScaleRecord(id,{scaleType:'Walk6Min',score:v,conclusion:SCALE_DEFINITIONS.Walk6Min.conclusion(v),data:{distance:v},date:Date.now()})){toast('⚠️ 保存失败：存储空间不足');return}
     toast('6分钟步行已保存');route('/scales/'+id);
   };
   wrapSave('sl_walk_save');
@@ -3108,7 +3156,7 @@ routes['/scales/:id']=function(id){
     var saveBtn=document.querySelector('[data-cs-save="'+cs.id+'"]');
     if(saveBtn)saveBtn.onclick=function(){
       var total=0;Object.keys(csData).forEach(function(k){total+=csData[k]});
-      addScaleRecord(id,{scaleType:'custom_'+cs.id,score:total,conclusion:cs.name+' 总分 '+total+'/'+cs.maxTotal,data:csData,date:Date.now()});
+      if(!addScaleRecord(id,{scaleType:'custom_'+cs.id,score:total,conclusion:cs.name+' 总分 '+total+'/'+cs.maxTotal,data:csData,date:Date.now()})){toast('⚠️ 保存失败：存储空间不足');return}
       toast('已保存');route('/scales/'+id);
     };
     if(saveBtn)wrapSaveEl(saveBtn);
@@ -3130,7 +3178,7 @@ routes['/scales/:id']=function(id){
     var maxTotal=questions.reduce(function(a,b){return a+b.maxScore},0);
     var arr=getCustomScales();
     arr.push({id:uid(),name:nm,category:ct,questions:questions,maxTotal:maxTotal});
-    setCustomScales(arr);
+    if(!setCustomScales(arr)){toast('⚠️ 保存失败：存储空间不足');return}
     toast('自定义量表已创建');
     route('/scales/'+id);
   };
@@ -3321,7 +3369,7 @@ routes['/plan/:id']=function(id){
 
   // save
   document.getElementById('plan_save').onclick=function(){
-    setPlan(id,existing);
+    if(!setPlan(id,existing)){toast('⚠️ 保存失败：存储空间不足');return}
     toast('方案已保存');
   };
   wrapSave('plan_save');
@@ -3580,7 +3628,7 @@ function showOnboarding(){
       var profiles=getProfiles();
       var np={id:uid(),name:name,department:dept,role:role};
       profiles.push(np);
-      setProfiles(profiles);
+      if(!setProfiles(profiles)){toast('⚠️ 保存失败：存储空间不足');return}
       setActiveProfileId(np.id);
     }
     LS.set('onboarded',true);
