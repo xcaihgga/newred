@@ -383,7 +383,19 @@ document.addEventListener('DOMContentLoaded',function(){
 /* ========================= Storage Helpers ========================= */
 var LS = {
   get:function(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},
-  set:function(k,v){localStorage.setItem(k,JSON.stringify(v))},
+  set:function(k,v){
+    try{
+      localStorage.setItem(k,JSON.stringify(v));
+      return true;
+    }catch(e){
+      if(e.name==='QuotaExceededError'||e.code===22||e.code===1014){
+        toast('⚠️ 存储空间已满，无法保存！请导出备份后清理旧数据');
+      }else{
+        toast('⚠️ 保存失败：'+e.message);
+      }
+      return false;
+    }
+  },
   del:function(k){localStorage.removeItem(k)}
 };
 
@@ -457,7 +469,10 @@ var DB = {
     });
   }
 };
-DB.init();
+DB.init().catch(function(err){
+  console.error('[DB] IndexedDB初始化失败，照片存储将不可用：',err);
+  toast('⚠️ 照片存储初始化失败，请刷新或清理浏览器存储');
+});
 
 /* ========================= Data Accessors ========================= */
 function getProfiles(){return LS.get('therapist_profiles')||[]}
@@ -561,21 +576,37 @@ function canViewPatient(p){
   return canEditPatient(p);
 }
 
-/* Delete a patient and all associated data */
+/* Delete a patient and all associated data — 原子操作，失败回滚 */
 function deletePatientData(pid){
-  var arr=getPatients().filter(function(p){return p.id!==pid});
-  setPatients(arr);
-  // delete records
-  var rs=getRecords();
-  var toDel=rs.filter(function(r){return r.patientId===pid});
-  rs=rs.filter(function(r){return r.patientId!==pid});
-  setRecords(rs);
-  toDel.forEach(function(r){if(r.photoId){DB.delPhoto(r.photoId)}});
-  // delete assessments/specialExams/scales/plans
-  var a=getAssessments();delete a[pid];setAssessments(a);
-  var se=getSpecialExams();delete se[pid];setSpecialExams(se);
-  var sc=getScales();delete sc[pid];setScales(sc);
-  var pl=getPlans();delete pl[pid];setPlans(pl);
+  var bak_patients=getPatients();
+  var bak_records=getRecords();
+  var bak_assessments=getAssessments();
+  var bak_specialExams=getSpecialExams();
+  var bak_scales=getScales();
+  var bak_plans=getPlans();
+  function rollback(){
+    LS.set('patients',bak_patients);
+    LS.set('records',bak_records);
+    LS.set('assessments',bak_assessments);
+    LS.set('specialExams',bak_specialExams);
+    LS.set('scales',bak_scales);
+    LS.set('plans',bak_plans);
+  }
+  var arr=bak_patients.filter(function(p){return p.id!==pid});
+  if(!LS.set('patients',arr)){rollback();return false}
+  var toDel=bak_records.filter(function(r){return r.patientId===pid});
+  var rs=bak_records.filter(function(r){return r.patientId!==pid});
+  if(!LS.set('records',rs)){rollback();return false}
+  toDel.forEach(function(r){if(r.photoId){DB.delPhoto(r.photoId).catch(function(){})}});
+  var a=bak_assessments;delete a[pid];
+  if(!LS.set('assessments',a)){rollback();return false}
+  var se=bak_specialExams;delete se[pid];
+  if(!LS.set('specialExams',se)){rollback();return false}
+  var sc=bak_scales;delete sc[pid];
+  if(!LS.set('scales',sc)){rollback();return false}
+  var pl=bak_plans;delete pl[pid];
+  if(!LS.set('plans',pl)){rollback();return false}
+  return true;
 }
 
 /* ==================== Constants ==================== */
@@ -833,11 +864,27 @@ function simpleHash(str){
 }
 function escapeHtml(s){
   if(s==null)s='';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 /* toast & confirm modal */
 function toast(msg){var t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove()},1800)}
+/* guard save button against double-click race (sync & async) */
+function wrapSaveEl(el){
+  if(!el||!el.onclick)return;
+  var orig=el.onclick;
+  el.onclick=function(){
+    if(el.dataset.busy)return;
+    el.dataset.busy='1';el.disabled=true;
+    var reset=function(){el.dataset.busy='';el.disabled=false};
+    var r;
+    try{r=orig.apply(this,arguments)}
+    catch(e){reset();throw e}
+    if(r&&typeof r.then==='function'){r.then(reset,reset)}
+    else{setTimeout(reset,500)}
+  };
+}
+function wrapSave(id){wrapSaveEl(document.getElementById(id))}
 function confirmDialog(msg,cb){
   var mask=document.createElement('div');
   mask.className='modal-mask';
@@ -1246,8 +1293,11 @@ routes['/patients']=function(param,query){
   var dels=document.querySelectorAll('[data-del]');
   for(var j=0;j<dels.length;j++){(function(el){el.onclick=function(e){e.stopPropagation();confirmDialog('确定删除该患者？将同时删除其所有评估、检查、量表、方案和拍照记录',function(){
     var id=el.getAttribute('data-del');
-    deletePatientData(id);
-    toast('已删除患者及关联数据');route('/patients');
+    if(deletePatientData(id)){
+      toast('已删除患者及关联数据');route('/patients');
+    }else{
+      toast('删除失败：存储空间不足，已回滚');
+    }
   })}})(dels[j])}
   var cards=document.querySelectorAll('[data-pid]');
   for(var k=0;k<cards.length;k++){(function(el){el.onclick=function(){go('/patient/'+el.getAttribute('data-pid'))}})(cards[k])}
@@ -1293,6 +1343,7 @@ function showPatientForm(id){
     setPatients(arr);
     mask.remove();toast('已保存');route('/patients');
   };
+  wrapSave('pf_save');
   mask.onclick=function(e){if(e.target===mask)mask.remove()};
 }
 
@@ -1353,8 +1404,13 @@ routes['/patient/:id']=function(id){
     var r=getRecord(rid);
     if(r&&r.photoId){
       DB.getPhoto(r.photoId).then(function(blob){
-        if(blob){var url=URL.createObjectURL(blob);var img=document.getElementById('thumb_'+rid);if(img)img.src=url}
-      });
+        if(blob){
+          var url=URL.createObjectURL(blob);
+          var img=document.getElementById('thumb_'+rid);
+          if(img){img.onload=function(){URL.revokeObjectURL(url)};img.src=url}
+          else{URL.revokeObjectURL(url)}
+        }
+      }).catch(function(){});
     }
   });
 };
@@ -1552,7 +1608,7 @@ routes['/camera']=function(param,query){
       var c=pendingCapture;
       var rec={id:uid(),recordNo:c.rno,patientId:c.pid,patientName:c.pname,therapistName:c.th,treatmentType:c.type,location:c.loc,timestamp:c.ts,photoId:null};
       // save blob to idb with id=rec.id
-      DB.putPhoto(rec.id,c.blob).then(function(){
+      return DB.putPhoto(rec.id,c.blob).then(function(){
         rec.photoId=rec.id;
         var rs=getRecords();
         rs.push(rec);
@@ -1564,20 +1620,23 @@ routes['/camera']=function(param,query){
     };
     if(needUpdate&&pendingCapture.file){
       // regenerate then save
-      var fr=new FileReader();
-      fr.onload=function(){
-        addWatermark(fr.result,{
-          datetime:fmtTimeShort(f.ts),location:f.loc,therapist:f.th,patient:f.pname,type:f.type,recordNo:f.rno
-        },function(blob,dataURL){
-          pendingCapture={blob:blob,dataURL:dataURL,file:pendingCapture.file,imgURL:fr.result,pid:f.pid,pname:f.pname,type:f.type,loc:f.loc,th:f.th,ts:f.ts,rno:f.rno};
-          doSave();
-        });
-      };
-      fr.readAsDataURL(pendingCapture.file);
+      return new Promise(function(resolve,reject){
+        var fr=new FileReader();
+        fr.onload=function(){
+          addWatermark(fr.result,{
+            datetime:fmtTimeShort(f.ts),location:f.loc,therapist:f.th,patient:f.pname,type:f.type,recordNo:f.rno
+          },function(blob,dataURL){
+            pendingCapture={blob:blob,dataURL:dataURL,file:pendingCapture.file,imgURL:fr.result,pid:f.pid,pname:f.pname,type:f.type,loc:f.loc,th:f.th,ts:f.ts,rno:f.rno};
+            doSave().then(resolve,reject);
+          });
+        };
+        fr.readAsDataURL(pendingCapture.file);
+      });
     }else{
-      doSave();
+      return doSave();
     }
   };
+  wrapSave('cam_save');
 };
 
 /* ---- Records List ---- */
@@ -1601,8 +1660,13 @@ routes['/records']=function(){
     var r=getRecord(rid);
     if(r&&r.photoId){
       DB.getPhoto(r.photoId).then(function(blob){
-        if(blob){var url=URL.createObjectURL(blob);var img=document.getElementById('thumb_'+rid);if(img)img.src=url}
-      });
+        if(blob){
+          var url=URL.createObjectURL(blob);
+          var img=document.getElementById('thumb_'+rid);
+          if(img){img.onload=function(){URL.revokeObjectURL(url)};img.src=url}
+          else{URL.revokeObjectURL(url)}
+        }
+      }).catch(function(){});
     }
   });
 };
@@ -1627,8 +1691,13 @@ routes['/record/:id']=function(id){
   // load big photo
   if(r.photoId){
     DB.getPhoto(r.photoId).then(function(blob){
-      if(blob){var url=URL.createObjectURL(blob);var img=document.getElementById('detail_img');if(img)img.src=url}
-    });
+      if(blob){
+        var url=URL.createObjectURL(blob);
+        var img=document.getElementById('detail_img');
+        if(img){img.onload=function(){URL.revokeObjectURL(url)};img.src=url}
+        else{URL.revokeObjectURL(url)}
+      }
+    }).catch(function(){});
   }
   document.getElementById('gen_cert').onclick=function(){
     var area=document.getElementById('cert_area');
@@ -1861,6 +1930,7 @@ routes['/settings']=function(){
     }
     toast('已保存');route('/settings');
   };
+  wrapSave('set_save');
   // add identity
   document.getElementById('set_addprofile').onclick=function(){showProfileForm(null)};
   // edit identity
@@ -1916,8 +1986,11 @@ routes['/settings']=function(){
   // delete patient (admin)
   document.querySelectorAll('[data-delap]').forEach(function(el){
     el.onclick=function(e){e.stopPropagation();confirmDialog('确定删除该患者？将同时删除其所有评估、检查、量表、方案和拍照记录',function(){
-      deletePatientData(el.getAttribute('data-delap'));
-      toast('已删除');route('/settings');
+      if(deletePatientData(el.getAttribute('data-delap'))){
+        toast('已删除');route('/settings');
+      }else{
+        toast('删除失败：存储空间不足，已回滚');
+      }
     })};
   });
   // export all patients
@@ -2021,6 +2094,7 @@ function showProfileForm(id){
     setProfiles(arr);
     mask.remove();toast('已保存');route('/settings');
   };
+  wrapSave('pf_id_save');
   mask.onclick=function(e){if(e.target===mask)mask.remove()};
 }
 
@@ -2636,6 +2710,7 @@ routes['/assessment/:id']=function(id){
     setAssessment(id,data);
     toast('评估已保存');
   };
+  wrapSave('as_save');
 };
 
 /* ==================== Task 3: Special Exam Module ==================== */
@@ -2652,19 +2727,20 @@ routes['/special-exam/:id']=function(id){
   existing.forEach(function(e){resultMap[e.examName]={result:e.result,note:e.note}});
   // group by category
   var cats={};
-  allExams.forEach(function(e){if(!cats[e.category])cats[e.category]=[];cats[e.category].push(e)});
+  allExams.forEach(function(e,idx){if(!cats[e.category])cats[e.category]=[];cats[e.category].push({exam:e,idx:idx})});
 
   var bodyHtml='';
   Object.keys(cats).forEach(function(cat){
     bodyHtml+='<div class="cat-group"><div class="cat-title">'+escapeHtml(cat)+'</div>';
-    cats[cat].forEach(function(e){
+    cats[cat].forEach(function(item){
+      var e=item.exam;var idx=item.idx;
       var cur=resultMap[e.name]||{result:'unchecked',note:''};
       var resultHtml=EXAM_RESULTS.map(function(r){
-        return '<label class="'+r.cls+(cur.result===r.val?' checked':'')+'" data-res="'+r.val+'"><input type="radio" name="ex_'+escapeHtml(e.name)+'" value="'+r.val+'" '+(cur.result===r.val?'checked':'')+'><span>'+r.label+'</span></label>';
+        return '<label class="'+r.cls+(cur.result===r.val?' checked':'')+'" data-res="'+r.val+'"><input type="radio" name="ex_'+idx+'" value="'+r.val+'" '+(cur.result===r.val?'checked':'')+'><span>'+r.label+'</span></label>';
       }).join('');
       bodyHtml+='<div class="exam-row"><div class="ex-name">'+escapeHtml(e.name)+'</div>'+
         '<div class="ex-result">'+resultHtml+'</div>'+
-        '<input class="ex-note" placeholder="备注" value="'+escapeHtml(cur.note||'')+'" data-note="'+escapeHtml(e.name)+'">'+
+        '<input class="ex-note" placeholder="备注" value="'+escapeHtml(cur.note||'')+'" data-note="'+idx+'">'+
         (e.video?'<span class="ex-video" data-video="'+escapeHtml(e.video)+'">▶ 观看示范</span>':'')+
         '</div>';
     });
@@ -2715,9 +2791,9 @@ routes['/special-exam/:id']=function(id){
   // save
   document.getElementById('se_save').onclick=function(){
     var list=[];
-    allExams.forEach(function(e){
-      var checked=document.querySelector('input[name="ex_'+e.name+'"]:checked');
-      var noteEl=document.querySelector('[data-note="'+e.name+'"]');
+    allExams.forEach(function(e,idx){
+      var checked=document.querySelector('input[name="ex_'+idx+'"]:checked');
+      var noteEl=document.querySelector('[data-note="'+idx+'"]');
       var res=checked?checked.value:'unchecked';
       var note=noteEl?noteEl.value.trim():'';
       // only save if has a result other than unchecked or has note
@@ -2728,6 +2804,7 @@ routes['/special-exam/:id']=function(id){
     setSpecialExamList(id,list);
     toast('已保存 '+list.length+' 项检查结果');
   };
+  wrapSave('se_save');
 };
 
 /* ==================== Task 4: Scales Module ==================== */
@@ -2829,6 +2906,7 @@ routes['/scales/:id']=function(id){
     addScaleRecord(id,{scaleType:'VAS',score:s,conclusion:SCALE_DEFINITIONS.VAS.conclusion(s),data:{score:s},date:Date.now()});
     toast('VAS已保存');route('/scales/'+id);
   };
+  wrapSave('sl_vas_save');
 
   // NRS
   var nrsVal=0;
@@ -2844,6 +2922,7 @@ routes['/scales/:id']=function(id){
     addScaleRecord(id,{scaleType:'NRS',score:nrsVal,conclusion:SCALE_DEFINITIONS.NRS.conclusion(nrsVal),data:{score:nrsVal},date:Date.now()});
     toast('NRS已保存');route('/scales/'+id);
   };
+  wrapSave('sl_nrs_save');
 
   // MPQ
   var sensItems=['跳痛','刺痛','灼痛','酸痛','胀痛'];
@@ -2899,6 +2978,7 @@ routes['/scales/:id']=function(id){
     addScaleRecord(id,{scaleType:'MPQ',score:total,conclusion:SCALE_DEFINITIONS.MPQ.conclusion(data),data:data,date:Date.now()});
     toast('MPQ已保存');route('/scales/'+id);
   };
+  wrapSave('sl_mpq_save');
 
   // Barthel
   var barthelData={};
@@ -2927,6 +3007,7 @@ routes['/scales/:id']=function(id){
     addScaleRecord(id,{scaleType:'Barthel',score:total,conclusion:SCALE_DEFINITIONS.Barthel.conclusion(total),data:barthelData,date:Date.now()});
     toast('Barthel已保存');route('/scales/'+id);
   };
+  wrapSave('sl_bar_save');
 
   // Walk6Min
   var walk=document.getElementById('sl_walk');
@@ -2940,6 +3021,7 @@ routes['/scales/:id']=function(id){
     addScaleRecord(id,{scaleType:'Walk6Min',score:v,conclusion:SCALE_DEFINITIONS.Walk6Min.conclusion(v),data:{distance:v},date:Date.now()});
     toast('6分钟步行已保存');route('/scales/'+id);
   };
+  wrapSave('sl_walk_save');
 
   // custom scales
   customScales.forEach(function(cs){
@@ -2968,9 +3050,10 @@ routes['/scales/:id']=function(id){
     var saveBtn=document.querySelector('[data-cs-save="'+cs.id+'"]');
     if(saveBtn)saveBtn.onclick=function(){
       var total=0;Object.keys(csData).forEach(function(k){total+=csData[k]});
-      addScaleRecord(id,{scaleType:'custom_'+cs.id,score:total,conclusion:escapeHtml(cs.name)+' 总分 '+total+'/'+cs.maxTotal,data:csData,date:Date.now()});
+      addScaleRecord(id,{scaleType:'custom_'+cs.id,score:total,conclusion:cs.name+' 总分 '+total+'/'+cs.maxTotal,data:csData,date:Date.now()});
       toast('已保存');route('/scales/'+id);
     };
+    if(saveBtn)wrapSaveEl(saveBtn);
   });
 
   // add custom scale
@@ -3183,6 +3266,7 @@ routes['/plan/:id']=function(id){
     setPlan(id,existing);
     toast('方案已保存');
   };
+  wrapSave('plan_save');
 
   // share plan
   document.getElementById('plan_share').onclick=function(){
