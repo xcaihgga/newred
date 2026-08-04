@@ -1,4 +1,4 @@
-var CACHE_NAME='rehab-v3.5.0';
+var CACHE_NAME='rehab-v3.5.1';
 var ASSETS=[
   './',
   './index.html',

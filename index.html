@@ -808,15 +808,24 @@ var EXAM_RESULTS=[
   {val:'unchecked',label:'未查',cls:''}
 ];
 
-/* Pain sites for palpation */
-var PAIN_SITES=['颈椎','腰椎','肩关节','肘关节','腕关节','髋关节','膝关节','踝关节','其他'];
+/* Pain sites for palpation（按文档补充：骶髂关节、肩胛骨、胸椎、骨盆） */
+var PAIN_SITES=['颈椎','胸椎','腰椎','骶髂关节','骨盆','肩关节','肩胛骨','肘关节','腕关节','髋关节','膝关节','踝关节','足部','其他'];
 /* Joint list for ROM */
-var ROM_JOINTS=['颈椎','肩','肘','腕','髋','膝','踝','腰椎'];
-var ROM_ACTIONS=['屈','伸','外展','内收','旋转'];
+var ROM_JOINTS=['颈椎','胸椎','腰椎','骶髂关节','肩','肘','腕','髋','膝','踝','足'];
+var ROM_ACTIONS=['屈','伸','外展','内收','旋转','内旋','外旋'];
 /* Muscle groups for muscle strength */
-var MUSCLE_GROUPS=['屈颈肌','伸颈肌','三角肌','肱二头肌','肱三头肌','腕屈肌','腕伸肌','髂腰肌','股四头肌','腘绳肌','胫前肌','小腿三头肌'];
+var MUSCLE_GROUPS=['屈颈肌','伸颈肌','三角肌','肱二头肌','肱三头肌','腕屈肌','腕伸肌','髂腰肌','股四头肌','腘绳肌','胫前肌','小腿三头肌','臀大肌','臀中肌','背伸肌群','腹肌'];
 /* ADL items */
 var ADL_ITEMS=['穿衣','进食','如厕','洗澡','行走','上下楼','购物','做饭','洗衣','服药'];
+
+/* 评估模板：常见主诉/发病时间/诱因（按用户文档示例规范化） */
+var ONSET_OPTIONS=['数小时前','1天内','3天前','1周前','2周前','1月前','3月前','半年前','1年以上'];
+var TRIGGER_OPTIONS=['搬重物','外伤','跌倒','脑卒中','术后','劳累','受凉','无明显诱因','其他'];
+var SYMPTOM_OPTIONS=[
+  '腰痛伴下肢放射痛','腰痛','颈痛伴上肢放射痛','颈痛','肩关节疼痛活动受限',
+  '膝关节疼痛肿胀','右侧肢体无力','左侧肢体无力','四肢无力',
+  '关节活动受限','吞咽困难','言语不清','平衡障碍','步态异常','头晕头痛'
+];
 
 /* Scale definitions (built-in) */
 var SCALE_DEFINITIONS={
@@ -2891,20 +2900,31 @@ routes['/assessment/:id']=function(id){
   app.innerHTML='<div class="page no-print">'+
     '<div class="page-header"><h2>主诉与客观评估</h2><p>'+escapeHtml(p.name)+' · '+(p.diagnosis||'未诊断')+'</p></div>'+
 
-    '<div class="card" style="margin-bottom:10px"><div class="form-group" style="margin:0"><label>选择需要填写的评估项</label><select id="as_section_sel">'+
-    '<option value="">请选择评估项...</option>'+
-    '<option value="as_cc">主诉</option>'+
-    '<option value="as_pal">触诊</option>'+
-    '<option value="as_rom">活动度 (ROM)</option>'+
-    '<option value="as_muscle">肌力评估</option>'+
-    '<option value="as_skin">皮温</option>'+
-    '<option value="as_adl">ADL 日常生活活动</option>'+
-    '</select></div></div>'+
+    '<div class="card" style="margin-bottom:10px;position:sticky;top:0;z-index:10"><div class="form-group" style="margin:0">'+
+      '<label>快速跳转（所有评估项已展开，点击下方按钮可滚动定位）</label>'+
+      '<div class="pill-group" id="as_quick_jump" style="flex-wrap:wrap">'+
+        '<span class="pill" data-jump="as_cc">主诉</span>'+
+        '<span class="pill" data-jump="as_pal">触诊</span>'+
+        '<span class="pill" data-jump="as_rom">活动度</span>'+
+        '<span class="pill" data-jump="as_muscle">肌力</span>'+
+        '<span class="pill" data-jump="as_skin">皮温</span>'+
+        '<span class="pill" data-jump="as_adl">ADL</span>'+
+      '</div>'+
+    '</div></div>'+
 
     '<div class="section-card" id="as_cc"><div class="sc-hd"><span>主诉</span><span class="arrow">▾</span></div><div class="sc-bd">'+
-      '<div class="form-group"><label>主要症状</label><textarea id="as_symptoms" placeholder="主要症状描述">'+escapeHtml(cc.symptoms)+'</textarea></div>'+
-      '<div class="form-group"><label>发病时间</label><input id="as_onset" value="'+escapeHtml(cc.onset)+'" placeholder="如：3天前/2周前"></div>'+
-      '<div class="form-group"><label>诱因/加重因素</label><input id="as_triggers" value="'+escapeHtml(cc.triggers)+'" placeholder="诱因或加重因素"></div>'+
+      '<div class="sub-section"><div class="ss-title">主要症状（点选快填，可在下方补充）</div><div class="pill-group" id="cc_symptoms_chips">'+
+        SYMPTOM_OPTIONS.map(function(s){return '<span class="pill'+(cc.symptoms&&cc.symptoms.indexOf(s)>=0?' on':'')+'" data-sym="'+s+'">'+s+'</span>'}).join('')+
+      '</div></div>'+
+      '<div class="form-group"><label>主要症状描述</label><textarea id="as_symptoms" placeholder="如：腰痛伴右下肢放射痛 / 右侧肢体无力">'+escapeHtml(cc.symptoms)+'</textarea></div>'+
+      '<div class="sub-section"><div class="ss-title">发病时间（点选快填）</div><div class="pill-group" id="cc_onset_chips">'+
+        ONSET_OPTIONS.map(function(s){return '<span class="pill'+(cc.onset===s?' on':'')+'" data-onset="'+s+'">'+s+'</span>'}).join('')+
+      '</div></div>'+
+      '<div class="form-group"><label>发病时间（可自定义）</label><input id="as_onset" value="'+escapeHtml(cc.onset)+'" placeholder="如：3天前/2周前"></div>'+
+      '<div class="sub-section"><div class="ss-title">诱因/加重因素（点选快填）</div><div class="pill-group" id="cc_triggers_chips">'+
+        TRIGGER_OPTIONS.map(function(s){return '<span class="pill'+(cc.triggers===s?' on':'')+'" data-trigger="'+s+'">'+s+'</span>'}).join('')+
+      '</div></div>'+
+      '<div class="form-group"><label>诱因（可自定义）</label><input id="as_triggers" value="'+escapeHtml(cc.triggers)+'" placeholder="如：搬重物/脑卒中"></div>'+
       '<div class="form-group"><label>既往史</label><textarea id="as_history" placeholder="既往病史">'+escapeHtml(cc.history)+'</textarea></div>'+
     '</div></div>'+
 
@@ -2939,20 +2959,35 @@ routes['/assessment/:id']=function(id){
     '<button class="btn btn-ghost" data-go="/patient/'+id+'" style="margin-top:8px">返回患者详情</button>'+
     '</div>';
 
-  // hide all sections by default
-  document.querySelectorAll('.section-card').forEach(function(s){s.style.display='none';s.classList.add('collapsed')});
-  // section selector - only show selected
-  var sectionSel=document.getElementById('as_section_sel');
-  if(sectionSel){
-    sectionSel.onchange=function(){
-      var val=this.value;
-      var sections=document.querySelectorAll('.section-card');
-      sections.forEach(function(s){
-        if(s.id===val){s.style.display='';s.classList.remove('collapsed')}
-        else{s.style.display='none'}
-      });
+  // 默认全部展开（按用户文档：所有评估项汇总展示，便于一次录完）
+  document.querySelectorAll('.section-card').forEach(function(s){s.style.display='';s.classList.remove('collapsed')});
+  // 快速跳转 chips：滚动定位到对应 section
+  document.querySelectorAll('#as_quick_jump .pill').forEach(function(el){
+    el.onclick=function(){
+      var targetId=el.getAttribute('data-jump');
+      var target=document.getElementById(targetId);
+      if(target){
+        // 高亮当前 chip
+        document.querySelectorAll('#as_quick_jump .pill').forEach(function(e2){e2.classList.remove('on')});
+        el.classList.add('on');
+        target.scrollIntoView({behavior:'smooth',block:'start'});
+        // 短暂闪烁边框提示
+        target.style.transition='box-shadow .3s';
+        target.style.boxShadow='0 0 0 3px var(--primary)';
+        setTimeout(function(){target.style.boxShadow=''},1200);
+      }
     };
-  }
+  });
+  // section 标题点击可折叠/展开（保留单模块收起能力）
+  document.querySelectorAll('.section-card .sc-hd').forEach(function(hd){
+    hd.style.cursor='pointer';
+    hd.onclick=function(){
+      var card=hd.parentElement;
+      var bd=card.querySelector('.sc-bd');
+      if(bd.style.display==='none'){bd.style.display='';hd.querySelector('.arrow').textContent='▾'}
+      else{bd.style.display='none';hd.querySelector('.arrow').textContent='▸'}
+    };
+  });
   // palpation pills
   var palSites=pal.sites.slice();
   document.querySelectorAll('#pal_sites .pill').forEach(function(el){
@@ -2966,6 +3001,62 @@ routes['/assessment/:id']=function(id){
   // pain slider
   var painInput=document.getElementById('pal_pain');
   painInput.oninput=function(){document.getElementById('pal_pain_v').textContent=this.value};
+
+  // 主诉：症状多选 chips（点击追加到 textarea）
+  var symInput=document.getElementById('as_symptoms');
+  document.querySelectorAll('#cc_symptoms_chips .pill').forEach(function(el){
+    el.onclick=function(){
+      var s=el.getAttribute('data-sym');
+      var cur=symInput.value.trim();
+      // 单选模式：点击高亮，再次点取消；textarea 同步追加
+      var isOn=el.classList.contains('on');
+      document.querySelectorAll('#cc_symptoms_chips .pill').forEach(function(e2){e2.classList.remove('on')});
+      if(isOn){
+        // 取消：从 textarea 中移除该症状
+        symInput.value=cur.replace(new RegExp('，?'+s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'，?'),'').replace(/^，|，$/,'').trim();
+      }else{
+        el.classList.add('on');
+        symInput.value=cur?cur+'，'+s:s;
+      }
+      symInput.focus();
+    };
+  });
+  // 主诉：发病时间单选 chips
+  var onsetInput=document.getElementById('as_onset');
+  document.querySelectorAll('#cc_onset_chips .pill').forEach(function(el){
+    el.onclick=function(){
+      var s=el.getAttribute('data-onset');
+      document.querySelectorAll('#cc_onset_chips .pill').forEach(function(e2){e2.classList.remove('on')});
+      if(onsetInput.value===s){
+        onsetInput.value='';el.classList.remove('on');
+      }else{
+        el.classList.add('on');onsetInput.value=s;
+      }
+    };
+  });
+  // 主诉：诱因单选 chips
+  var trigInput=document.getElementById('as_triggers');
+  document.querySelectorAll('#cc_triggers_chips .pill').forEach(function(el){
+    el.onclick=function(){
+      var s=el.getAttribute('data-trigger');
+      document.querySelectorAll('#cc_triggers_chips .pill').forEach(function(e2){e2.classList.remove('on')});
+      if(trigInput.value===s){
+        trigInput.value='';el.classList.remove('on');
+      }else{
+        el.classList.add('on');trigInput.value=s;
+      }
+    };
+  });
+  // textarea 手动输入时，清掉对应 chips 高亮（避免状态错乱）
+  symInput.oninput=function(){
+    document.querySelectorAll('#cc_symptoms_chips .pill').forEach(function(e2){e2.classList.remove('on')});
+  };
+  onsetInput.oninput=function(){
+    document.querySelectorAll('#cc_onset_chips .pill').forEach(function(e2){e2.classList.remove('on')});
+  };
+  trigInput.oninput=function(){
+    document.querySelectorAll('#cc_triggers_chips .pill').forEach(function(e2){e2.classList.remove('on')});
+  };
 
   // ROM render
   function renderRom(){
