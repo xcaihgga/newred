@@ -223,7 +223,6 @@ a{text-decoration:none;color:inherit}
 .exam-row .ex-result label.pos:has(input:checked){background:#e53e3e;border-color:#e53e3e}
 .exam-row .ex-result label.neg:has(input:checked){background:#38a169;border-color:#38a169}
 .exam-row .ex-note{width:100%;padding:5px 8px;font-size:11px;border:1px solid #e2e8f0;border-radius:4px;margin-top:4px}
-.exam-row .ex-video{font-size:11px;color:var(--primary);cursor:pointer;text-decoration:underline}
 
 /* tag badges */
 .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;background:#edf2f7;color:#555;margin:2px}
@@ -237,6 +236,17 @@ a{text-decoration:none;color:inherit}
 .scale-card .sc-name{font-weight:600;font-size:14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
 .scale-card .sc-score{font-size:18px;font-weight:700;color:var(--primary)}
 .scale-card .sc-conclusion{font-size:12px;color:#666;margin-top:4px;padding:6px;background:#f7fafc;border-radius:4px}
+/* 量表库参考 */
+.lib-info{font-size:12px;color:#555;background:#f7fafc;border-radius:6px;padding:8px 10px;margin-bottom:8px}
+.lib-info .li-row{margin:2px 0}
+.lib-cat{margin-bottom:6px;border:1px solid #edf2f7;border-radius:6px;overflow:hidden}
+.lib-cat-hd{background:#ebf8ff;padding:8px 10px;font-weight:600;font-size:13px;cursor:pointer;color:#2c5282;user-select:none}
+.lib-cat-bd{padding:4px 10px}
+.lib-item{border-bottom:1px solid #f0f0f0;padding:8px 0}
+.lib-item:last-child{border-bottom:none}
+.lib-item .li-name{font-weight:600;font-size:13px;color:#333;margin-bottom:3px}
+.lib-item .li-row{font-size:12px;color:#555;line-height:1.6}
+.lib-item .li-row b{color:#2c5282}
 
 /* plan stage */
 .plan-stage{border-left:3px solid var(--primary);padding-left:12px;margin-bottom:14px}
@@ -249,7 +259,6 @@ a{text-decoration:none;color:inherit}
 .treat-item{background:#f7fafc;border-radius:6px;padding:8px 10px;margin-bottom:6px;font-size:12px}
 .treat-item .ti-name{font-weight:600;color:#333}
 .treat-item .ti-meta{color:#888;margin-top:2px}
-.treat-item .ti-video{color:var(--primary);font-size:11px;text-decoration:underline;cursor:pointer}
 
 /* report */
 .report-page{background:#fff;border-radius:var(--radius);padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
@@ -299,7 +308,6 @@ a{text-decoration:none;color:inherit}
 .di-hd{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px}
 .ti-name{font-weight:600;font-size:14px}
 .ti-meta{font-size:12px;color:#666;margin-top:4px}
-.ti-video{font-size:12px;color:#3182ce;margin-top:4px;display:inline-block;cursor:pointer}
 .tag{display:inline-block;font-size:10px;padding:1px 6px;background:#ebf8ff;color:#3182ce;border-radius:3px;margin-left:4px;font-weight:400}
 
 /* price query table */
@@ -588,7 +596,7 @@ function setAssessments(a){return LS.set('assessments',a)}
 function getAssessment(pid){var a=getAssessments();return a[pid]||null}
 function setAssessment(pid,data){var a=getAssessments();data.updatedAt=Date.now();a[pid]=data;return setAssessments(a)}
 
-/* Special exams: {patientId: [{examName, category, result, note, video, date}]} */
+/* Special exams: {patientId: [{examName, category, result, note, date}]} */
 function getSpecialExams(){return LS.get('specialExams')||{}}
 function setSpecialExams(s){return LS.set('specialExams',s)}
 function getSpecialExamList(pid){var s=getSpecialExams();return s[pid]||[]}
@@ -784,21 +792,28 @@ function deletePatientData(pid){
 
 /* ==================== Constants ==================== */
 /* Special examination library */
+/* 特殊检查库（按用户文档：去除失效演示链接，补充脑卒中/神经科常用项） */
 var SPECIAL_EXAMS=[
-  {name:'直腿抬高试验',category:'腰椎',video:'https://www.bilibili.com/video/BV1xW411w7w9'},
-  {name:'4字试验(Patrick)',category:'髋关节',video:'https://www.bilibili.com/video/BV1LW411w7mK'},
-  {name:'托马斯试验',category:'髋关节',video:'https://www.bilibili.com/video/BV1hW411w7FB'},
-  {name:'麦肯基测试',category:'腰椎',video:'https://www.bilibili.com/video/BV1gW411w7dr'},
-  {name:'FABER试验',category:'髋关节',video:'https://www.bilibili.com/video/BV1QW411w7Jj'},
-  {name:'Neer撞击试验',category:'肩关节',video:'https://www.bilibili.com/video/BV1iW411w7xt'},
-  {name:'Hawkins试验',category:'肩关节',video:'https://www.bilibili.com/video/BV1AW411w7Ra'},
-  {name:'Drop Arm试验',category:'肩关节',video:'https://www.bilibili.com/video/BV17W411w7St'},
-  {name:'Tinel征',category:'腕关节',video:'https://www.bilibili.com/video/BV1rW411w7wC'},
-  {name:'Phalen试验',category:'腕关节',video:'https://www.bilibili.com/video/BV1bW411w7We'},
-  {name:'Lachman试验',category:'膝关节',video:'https://www.bilibili.com/video/BV1YW411w7pa'},
-  {name:'McMurray试验',category:'膝关节',video:'https://www.bilibili.com/video/BV1ZW411w7TK'},
-  {name:'前抽屉试验',category:'踝关节',video:'https://www.bilibili.com/video/BV1JW411w7GV'},
-  {name:'磨髌试验',category:'膝关节',video:'https://www.bilibili.com/video/BV1LW411w7pM'}
+  {name:'直腿抬高试验',category:'腰椎'},
+  {name:'4字试验(Patrick)',category:'髋关节'},
+  {name:'托马斯试验',category:'髋关节'},
+  {name:'麦肯基测试',category:'腰椎'},
+  {name:'FABER试验',category:'髋关节'},
+  {name:'Neer撞击试验',category:'肩关节'},
+  {name:'Hawkins试验',category:'肩关节'},
+  {name:'Drop Arm试验',category:'肩关节'},
+  {name:'Tinel征',category:'腕关节'},
+  {name:'Phalen试验',category:'腕关节'},
+  {name:'Lachman试验',category:'膝关节'},
+  {name:'McMurray试验',category:'膝关节'},
+  {name:'前抽屉试验',category:'踝关节'},
+  {name:'磨髌试验',category:'膝关节'},
+  {name:'布鲁津斯基征',category:'神经'},
+  {name:'Kernig征',category:'神经'},
+  {name:'颈项强直',category:'神经'},
+  {name:'巴宾斯基征',category:'神经'},
+  {name:'霍夫曼征',category:'神经'},
+  {name:'戈登征',category:'神经'}
 ];
 /* exam result options */
 var EXAM_RESULTS=[
@@ -847,7 +862,7 @@ var SCALE_DEFINITIONS={
     var lvl=total<=10?'轻度':(total<=20?'中度':'重度');
     return 'PRI总分 '+total+'（感觉项'+s+' + 情感项'+a+'） - '+lvl+'疼痛';
   }},
-  Barthel:{name:'Barthel指数',category:'运动功能评估',type:'barthel',max:100,conclusion:function(score){
+  Barthel:{name:'Barthel指数',category:'功能与生活能力',type:'barthel',max:100,conclusion:function(score){
     if(score>60)return '独立（>60分）';
     if(score>=41)return '轻度依赖（41-60分）';
     if(score>=21)return '中度依赖（21-40分）';
@@ -874,78 +889,166 @@ var BARTHEL_ITEMS=[
   {name:'平地行走',opts:[{l:'独立45m',v:15},{l:'需协助',v:10},{l:'轮椅独立',v:5},{l:'不能',v:0}]},
   {name:'上下楼梯',opts:[{l:'独立',v:10},{l:'需协助',v:5},{l:'不能',v:0}]}
 ];
-/* Scale categories */
-var SCALE_CATEGORIES=['全部','心肺评估','疼痛评估','运动功能评估','自定义'];
+/* 量表库（按用户《评估量表汇总》文档：71个标准化量表，12大分类）
+   interactive=true 表示有专属交互表单（见 SCALE_DEFINITIONS），其余走通用快速评分记录 */
+var SCALE_LIBRARY=[
+  /* 疼痛评估 */
+  {key:'VAS',name:'VAS',fullName:'VAS视觉模拟疼痛评分',category:'疼痛评估',purpose:'主观疼痛强度',audience:'成人',scoring:'10cm直线标痛点',scoreRange:'0-10',interpretation:'0无痛；1-3轻度；4-6中度；7-10重度',notes:'视力/认知障碍不用，改用面部表情量表',interactive:true},
+  {key:'NRS',name:'NRS',fullName:'NRS数字疼痛评分',category:'疼痛评估',purpose:'量化疼痛',audience:'广泛',scoring:'0-10数字选择',scoreRange:'0-10',interpretation:'同VAS（0-3轻/4-6中/7-10重）',notes:'最简单自评，每日可多次',interactive:true},
+  {key:'P4',name:'P4',fullName:'P4疼痛强度量表',category:'疼痛评估',purpose:'疼痛强度',audience:'成人',scoring:'4问(最轻/最痛/平均/现在)各0-10',scoreRange:'0-40',interpretation:'<10轻度；10-20中度；>20重度',notes:'需患者回忆过去24h'},
+  {key:'SFMPQ',name:'SF-MPQ',fullName:'McGill疼痛问卷(简明)',category:'疼痛评估',purpose:'多维度疼痛性质',audience:'详评者',scoring:'15词(11感觉+4情感)0-3分+VAS',scoreRange:'0-45+0-10',interpretation:'总分越高疼痛体验越复杂严重',notes:'耗时约5-10分钟',interactive:true},
+  {key:'WongBaker',name:'Wong-Baker',fullName:'面部表情疼痛量表',category:'疼痛评估',purpose:'疼痛程度',audience:'儿童/认知障碍者',scoring:'6张面部表情0-10',scoreRange:'0-10',interpretation:'0无痛，偶数递增至10剧痛',notes:'非语言，3-18岁适用'},
+  {key:'ODI',name:'ODI',fullName:'Oswestry功能障碍指数',category:'疼痛评估',purpose:'腰痛功能',audience:'腰痛患者',scoring:'10节(疼痛/护理/提物/行走/坐/站/睡眠/社交等)每节0-5',scoreRange:'0-100%',interpretation:'0-20%轻；20-40%中；40-60%重；60-80%极重；80-100%卧床',notes:'妊娠或严重合并症需注解'},
+  {key:'RMQ',name:'RMQ',fullName:'Roland-Morris功能障碍问卷',category:'疼痛评估',purpose:'腰痛障碍',audience:'腰痛患者',scoring:'24条陈述勾选',scoreRange:'0-24',interpretation:'0-4轻；5-14中；15-24重',notes:'专针对腰痛相关活动受限'},
+  /* 颈肩评估 */
+  {key:'NDI',name:'NDI',fullName:'NDI颈椎功能障碍指数',category:'颈肩评估',purpose:'颈椎病功能',audience:'颈椎病患者',scoring:'10项(疼痛/护理/提物/阅读/头痛/注意力/工作/驾驶/睡眠/娱乐)每项0-5',scoreRange:'0-100%',interpretation:'同ODI百分比意义',notes:'颈椎病、颈痛患者'},
+  {key:'JOAC',name:'JOA颈椎',fullName:'JOA颈椎评分',category:'颈肩评估',purpose:'脊髓型颈椎病神经功能',audience:'颈髓受压者',scoring:'上肢运动(0-4)+下肢运动(0-4)+感觉(0-6)+膀胱(0-3)',scoreRange:'0-17',interpretation:'17正常；11-16轻；6-10中；0-5重',notes:'评估脊髓型颈椎病'},
+  /* 腰背评估 */
+  {key:'JOAL',name:'JOA腰椎',fullName:'JOA腰椎评分',category:'腰背评估',purpose:'腰椎疾病',audience:'腰突/狭窄',scoring:'主观症状(9)+体征(6)+ADL(14)+膀胱(-6~0)',scoreRange:'0-29',interpretation:'>25优；15-25良；<15差',notes:'需查体'},
+  /* 上肢评估 */
+  {key:'UCLA',name:'UCLA',fullName:'UCLA肩袖评分',category:'上肢评估',purpose:'肩关节功能',audience:'肩袖伤',scoring:'疼痛10+功能10+主动前屈5+前屈肌力5+满意度5',scoreRange:'0-35',interpretation:'34-35优；29-33良；<29差',notes:'肩袖修复术后'},
+  {key:'Constant',name:'Constant',fullName:'Constant-Murley肩关节评分',category:'上肢评估',purpose:'肩全面功能',audience:'肩病',scoring:'疼痛15+ADL20+ROM40+肌力25',scoreRange:'0-100',interpretation:'>90优；80-89良；70-79可；<70差',notes:'需肌力计与量角器'},
+  {key:'DASH',name:'DASH',fullName:'DASH上肢功能障碍评定',category:'上肢评估',purpose:'上肢症状功能',audience:'上肢肌骨病',scoring:'30题(21功能+9症状)每题1-5',scoreRange:'0-100',interpretation:'0正常；>30显著障碍',notes:'覆盖肩肘腕手'},
+  {key:'MayoElbow',name:'Mayo肘',fullName:'Mayo肘关节功能评分',category:'上肢评估',purpose:'肘功能',audience:'肘病/术后',scoring:'疼痛45+活动度20+稳定性10+日常功能25',scoreRange:'0-100',interpretation:'90-100优；75-89良；60-74可；<60差',notes:'需测活动弧与松弛度'},
+  /* 腕手评估 */
+  {key:'QuickDASH',name:'QuickDASH',fullName:'QuickDASH简短上肢功能评分',category:'腕手评估',purpose:'简版上肢功能',audience:'同DASH',scoring:'11题(8功能+3症状)1-5',scoreRange:'0-100',interpretation:'同DASH',notes:'DASH简版，省时'},
+  {key:'Cooney',name:'Cooney',fullName:'Cooney腕关节评分',category:'腕手评估',purpose:'腕功能',audience:'腕病/术后',scoring:'疼痛25+功能25+活动度25+握力25',scoreRange:'0-100',interpretation:'>90优；80-89良；65-79可；<65差',notes:'需握力计'},
+  /* 下肢评估 */
+  {key:'Harris',name:'Harris',fullName:'HHS髋关节评分',category:'下肢评估',purpose:'髋功能',audience:'髋病/置换',scoring:'疼痛44+功能47+畸形4+活动度5',scoreRange:'0-100',interpretation:'90-100优；80-89良；70-79可；<70差',notes:'需测ROM'},
+  {key:'Lysholm',name:'Lysholm',fullName:'Lysholm膝关节评分',category:'下肢评估',purpose:'膝功能',audience:'韧带/半月板损伤',scoring:'跛行5+支撑5+交锁15+不稳25+疼痛25+肿胀10+爬楼10+蹲5',scoreRange:'0-100',interpretation:'95-100优；84-94良；65-83中；<65差',notes:'膝伤专用'},
+  {key:'Oxford',name:'Oxford',fullName:'Oxford膝关节评分',category:'下肢评估',purpose:'膝置换评估',audience:'TKA术后',scoring:'12题(疼痛/功能)每题1-5',scoreRange:'12-60',interpretation:'<20优；20-29良；>29差',notes:'分越高越差，需反转'},
+  {key:'IKDC',name:'IKDC',fullName:'IKDC膝关节评分',category:'下肢评估',purpose:'膝症状功能',audience:'各种膝伤',scoring:'18题症状/活动/功能换算',scoreRange:'0-100',interpretation:'越高越好',notes:'前叉损伤常见'},
+  /* 踝足评估 */
+  {key:'AOFAS',name:'AOFAS',fullName:'AOFAS踝-后足评分',category:'踝足评估',purpose:'踝足功能',audience:'踝伤',scoring:'疼痛40+功能50+对线10',scoreRange:'0-100',interpretation:'90-100优；75-89良；50-74可；<50差',notes:'需影像对线评估'},
+  {key:'FAAM',name:'FAAM',fullName:'FAAM足踝能力评分',category:'踝足评估',purpose:'足踝功能',audience:'足踝病',scoring:'ADL子量表21题+运动8题，每题0-4',scoreRange:'0-100%',interpretation:'百分比越高越好',notes:'患者自评'},
+  /* 功能与生活能力 */
+  {key:'PSFS',name:'PSFS',fullName:'PSFS患者特异性功能量表',category:'功能与生活能力',purpose:'个体活动困难度',audience:'功能障碍者',scoring:'患者写3-5个重要活动，每项0-10',scoreRange:'0-10',interpretation:'均值越高越好',notes:'个体化，治疗前后对比'},
+  {key:'Barthel',name:'Barthel',fullName:'Barthel指数',category:'功能与生活能力',purpose:'ADL能力',audience:'卒中/老人',scoring:'10项(进食/洗澡/修饰/穿衣/大小便控制/如厕/转移/行走/上下楼)',scoreRange:'0-100',interpretation:'100独立；60-99轻度依赖；40-59中；20-39重；<20完全依赖',notes:'量表效度好',interactive:true},
+  {key:'MBI',name:'MBI',fullName:'改良Barthel指数',category:'功能与生活能力',purpose:'精细ADL',audience:'同BI',scoring:'同BI但评分更细(如进食0,2,5,8,10)',scoreRange:'0-100',interpretation:'同BI',notes:'更敏感'},
+  {key:'FIM',name:'FIM',fullName:'FIM功能独立性评定',category:'功能与生活能力',purpose:'全面独立能力',audience:'重残患者',scoring:'18项(13运动+5认知)每项1-7',scoreRange:'18-126',interpretation:'126完全独立；108-125基本独立；<72依赖',notes:'需专业培训'},
+  {key:'Katz',name:'Katz',fullName:'Katz指数(ADL)',category:'功能与生活能力',purpose:'基本ADL',audience:'老年筛查',scoring:'6项(洗澡/穿衣/如厕/转移/大小便/进食)独立=1',scoreRange:'0-6',interpretation:'6独立；<4需照护',notes:'老年筛查'},
+  {key:'Lawton',name:'Lawton',fullName:'Lawton IADL',category:'功能与生活能力',purpose:'工具性ADL',audience:'社区老人',scoring:'8项(电话/购物/做饭/家务/洗衣/交通/药/钱)每项0-1',scoreRange:'0-8',interpretation:'低分提示工具性ADL受损',notes:'社区老人'},
+  {key:'FAC',name:'FAC',fullName:'功能性步行分级',category:'功能与生活能力',purpose:'步行功能',audience:'神经患者',scoring:'0不能~5完全独立',scoreRange:'0-5级',interpretation:'5独立',notes:'观察法'},
+  {key:'Holden',name:'Holden',fullName:'Holden步行能力分级',category:'功能与生活能力',purpose:'步行能力',audience:'卒中患者',scoring:'同FAC 0-5级',scoreRange:'0-5级',interpretation:'同FAC',notes:'观察法'},
+  {key:'Frenchay',name:'Frenchay',fullName:'Frenchay活动指数',category:'功能与生活能力',purpose:'生活参与',audience:'卒中社区',scoring:'15项(家务/休闲/外出)0-3',scoreRange:'0-45',interpretation:'越高越好',notes:'社区融入'},
+  {key:'FMAUE',name:'FMA-UE',fullName:'Fugl-Meyer上肢评估',category:'功能与生活能力',purpose:'上肢运动功能',audience:'卒中偏瘫',scoring:'肩肘24+腕10+手14+协调6',scoreRange:'0-66',interpretation:'越高越好',notes:'每项0-2'},
+  {key:'FMALE',name:'FMA-LE',fullName:'Fugl-Meyer下肢评估',category:'功能与生活能力',purpose:'下肢运动功能',audience:'卒中偏瘫',scoring:'髋膝14+踝8+协调6',scoreRange:'0-34',interpretation:'越高越好',notes:'每项0-2'},
+  {key:'BrunnstromUE',name:'Brunnstrom上肢',fullName:'Brunnstrom分期(上肢)',category:'功能与生活能力',purpose:'偏瘫恢复分期',audience:'偏瘫患者',scoring:'I弛缓~VI正常共6期',scoreRange:'I-VI',interpretation:'越高越好',notes:'分期报告'},
+  {key:'BrunnstromLE',name:'Brunnstrom下肢',fullName:'Brunnstrom分期(下肢)',category:'功能与生活能力',purpose:'偏瘫恢复分期',audience:'偏瘫患者',scoring:'I弛缓~VI正常共6期',scoreRange:'I-VI',interpretation:'越高越好',notes:'分期报告'},
+  {key:'BrunnstromHand',name:'Brunnstrom手',fullName:'Brunnstrom分期(手)',category:'功能与生活能力',purpose:'偏瘫恢复分期',audience:'偏瘫患者',scoring:'I弛缓~VI正常共6期',scoreRange:'I-VI',interpretation:'越高越好',notes:'分期报告'},
+  {key:'MAS',name:'MAS',fullName:'MAS运动评估',category:'功能与生活能力',purpose:'运动功能',audience:'卒中患者',scoring:'8项(翻身/坐/站等)0-6',scoreRange:'0-48',interpretation:'越高越好',notes:'卒中运动评估'},
+  {key:'RMI',name:'RMI',fullName:'Rivermead运动指数',category:'功能与生活能力',purpose:'活动能力',audience:'卒中/脑伤',scoring:'15项(翻身到跑)每项0-1',scoreRange:'0-15',interpretation:'越高越好',notes:'观察法'},
+  {key:'Motricity',name:'Motricity',fullName:'Motricity指数',category:'功能与生活能力',purpose:'肌力',audience:'卒中患者',scoring:'上下肢各3肌群(肩屈/肘伸/腕伸；髋屈/膝伸/踝背屈)',scoreRange:'0-100',interpretation:'越高越好',notes:'卒中肌力评估'},
+  {key:'UedaUE',name:'上田敏上肢',fullName:'上田敏偏瘫上肢',category:'功能与生活能力',purpose:'偏瘫功能',audience:'偏瘫患者',scoring:'12级(0-11)',scoreRange:'0-11',interpretation:'越高越好',notes:'级别报告'},
+  {key:'UedaLE',name:'上田敏下肢',fullName:'上田敏偏瘫下肢',category:'功能与生活能力',purpose:'偏瘫功能',audience:'偏瘫患者',scoring:'12级(0-11)',scoreRange:'0-11',interpretation:'越高越好',notes:'级别报告'},
+  /* 平衡与步行 */
+  {key:'BBS',name:'BBS',fullName:'Berg平衡量表',category:'平衡与步行',purpose:'平衡防跌',audience:'老/神经患者',scoring:'14项(坐站/转移/闭眼站/单脚站等)每项0-4',scoreRange:'0-56',interpretation:'<40高风险；41-45中风险；46-56低风险',notes:'需椅子台阶'},
+  {key:'TUG',name:'TUG',fullName:'TUG起立行走测试',category:'平衡与步行',purpose:'移动能力',audience:'老/神经患者',scoring:'椅高46cm走3m返回坐，计时',scoreRange:'秒',interpretation:'<10正常；>13.5跌倒风险；>30有跌倒史',notes:'观察法'},
+  {key:'FRT',name:'FRT',fullName:'功能性伸展测试',category:'平衡与步行',purpose:'动态平衡',audience:'老人',scoring:'臂前伸最大距',scoreRange:'cm',interpretation:'<15cm易跌',notes:'测量法'},
+  {key:'OLS',name:'OLS',fullName:'单脚站立测试',category:'平衡与步行',purpose:'静态平衡',audience:'老人',scoring:'睁眼单脚站计时',scoreRange:'秒',interpretation:'<5秒平衡差',notes:'观察法'},
+  {key:'Romberg',name:'Romberg',fullName:'Romberg测试',category:'平衡与步行',purpose:'本体/前庭',audience:'眩晕患者',scoring:'并足睁/闭眼观察',scoreRange:'观察',interpretation:'闭眼晃动/跌倒为异常',notes:'观察法'},
+  {key:'FingerNose',name:'指鼻试验',fullName:'协调测试(指鼻试验)',category:'平衡与步行',purpose:'协调功能',audience:'小脑患者',scoring:'指鼻反复观察',scoreRange:'观察',interpretation:'辨距不良/震颤为异常',notes:'观察法'},
+  {key:'TUG8ft',name:'8英尺TUG',fullName:'计时起立行走测试(8英尺版)',category:'平衡与步行',purpose:'短距移动',audience:'老人',scoring:'2.44m版本计时',scoreRange:'秒',interpretation:'同TUG',notes:'同TUG'},
+  {key:'DGI',name:'DGI',fullName:'动态步态指数',category:'平衡与步行',purpose:'动态平衡',audience:'老/前庭患者',scoring:'8项(变速/转头走等)0-3',scoreRange:'0-24',interpretation:'<19跌倒风险',notes:'观察法'},
+  /* 生活质量 */
+  {key:'SF12',name:'SF-12',fullName:'SF-12生活质量量表',category:'生活质量',purpose:'健康相关生活质量',audience:'普/患',scoring:'12题(PCS/MCS)',scoreRange:'标准分',interpretation:'PCS/MCS标准分',notes:'普适性量表'},
+  {key:'WaterSwallow',name:'洼田饮水',fullName:'洼田饮水试验',category:'生活质量',purpose:'吞咽筛查',audience:'卒中/老人',scoring:'喝30ml水分级',scoreRange:'1-5级',interpretation:'1级正常；5级严重',notes:'吞咽筛查'},
+  {key:'GUSS',name:'GUSS',fullName:'GUSS吞咽评估',category:'生活质量',purpose:'吞咽功能',audience:'卒中患者',scoring:'间接(唇/咽/呼吸)+直接(勺/杯/水)共20分',scoreRange:'0-20',interpretation:'分级评估',notes:'吞咽功能评估'},
+  {key:'FrenchayDys',name:'Frenchay构音',fullName:'Frenchay构音障碍评估',category:'生活质量',purpose:'构音功能',audience:'神经言语患者',scoring:'反射/呼吸/唇/颌/腭/喉/舌每项0-4',scoreRange:'分级',interpretation:'分级评估',notes:'构音障碍'},
+  {key:'BDAE',name:'BDAE',fullName:'波士顿诊断性失语检查',category:'生活质量',purpose:'失语评估',audience:'失语患者',scoring:'36子项综合',scoreRange:'综合',interpretation:'综合评估',notes:'失语症诊断'},
+  /* 肌肉与关节功能 */
+  {key:'MMT',name:'MMT',fullName:'MMT徒手肌力测试',category:'肌肉与关节功能',purpose:'肌力',audience:'肌减患者',scoring:'0无收缩~5正常',scoreRange:'0-5级',interpretation:'0无收缩；1微动；2重力下全幅；3抗重力；4抗阻部分；5正常',notes:'徒手肌力'},
+  {key:'ROM',name:'ROM',fullName:'ROM关节活动度评估',category:'肌肉与关节功能',purpose:'关节活动范围',audience:'关节病患者',scoring:'量角器测主动/被动度',scoreRange:'角度',interpretation:'各关节正常范围对照',notes:'量角器测量'},
+  {key:'Ashworth',name:'改良Ashworth',fullName:'改良Ashworth肌张力量表',category:'肌肉与关节功能',purpose:'肌张力/痉挛',audience:'上运动神经元损伤',scoring:'0正常~4僵直',scoreRange:'0-4级',interpretation:'0正常；1稍增；1+明显增但活动易；2部分僵；3全僵被动难；4僵直',notes:'痉挛评估'},
+  {key:'Tardieu',name:'改良Tardieu',fullName:'改良Tardieu量表',category:'肌肉与关节功能',purpose:'痉挛速度依赖',audience:'脑瘫患者',scoring:'快牵角度R1，慢牵R2，分0-4级',scoreRange:'角度/0-4级',interpretation:'R1与R2差值评估痉挛',notes:'速度依赖痉挛'},
+  {key:'Penn',name:'Penn',fullName:'Penn痉挛频率评分',category:'肌肉与关节功能',purpose:'痉挛频率',audience:'脊髓损伤患者',scoring:'0无~4>10次/h',scoreRange:'0-4级',interpretation:'0无；1<1次/天；2>1次/天；3>1次/h；4>10次/h',notes:'痉挛频率'},
+  {key:'Clonus',name:'Clonus',fullName:'Clonus分级',category:'肌肉与关节功能',purpose:'阵挛',audience:'上运动神经元损伤',scoring:'0无~4固定挛缩',scoreRange:'0-4级',interpretation:'0无；1<10秒；2>10秒；3持续需干预；4固定挛缩',notes:'阵挛评估'},
+  /* 心理状态 */
+  {key:'GAD7',name:'GAD-7',fullName:'GAD-7焦虑自评',category:'心理状态',purpose:'焦虑筛查',audience:'成人',scoring:'7题(紧张/担忧等)0-3',scoreRange:'0-21',interpretation:'5-9轻度；10-14中度；>=15重度',notes:'焦虑自评'},
+  {key:'PHQ9',name:'PHQ-9',fullName:'PHQ-9抑郁自评',category:'心理状态',purpose:'抑郁筛查',audience:'成人',scoring:'9题0-3',scoreRange:'0-27',interpretation:'5/10/15分级，>10建议治疗',notes:'抑郁自评'},
+  {key:'MMSE',name:'MMSE',fullName:'MMSE简易精神状态',category:'心理状态',purpose:'认知筛查',audience:'老/痴患者',scoring:'定向(10)+记忆(3)+注意(5)+回忆(3)+语言(9)',scoreRange:'0-30',interpretation:'文盲<17，小学<20，中学<24为痴呆',notes:'认知筛查'},
+  {key:'MoCA',name:'MoCA',fullName:'MoCA蒙特利尔认知评估',category:'心理状态',purpose:'轻度认知障碍',audience:'认知下降者',scoring:'注意/记忆/语言/视空间等',scoreRange:'0-30',interpretation:'<26为MCI（教育<12年+1）',notes:'轻度认知障碍筛查'},
+  {key:'GCS',name:'GCS',fullName:'GCS格拉斯哥昏迷评分',category:'心理状态',purpose:'意识水平',audience:'脑伤患者',scoring:'睁眼(1-4)+语言(1-5)+运动(1-6)',scoreRange:'3-15',interpretation:'<=8昏迷；9-12重度；13-15轻度',notes:'昏迷评估'},
+  {key:'HAMA',name:'HAMA',fullName:'HAMA汉密尔顿焦虑',category:'心理状态',purpose:'焦虑严重度',audience:'焦虑患者',scoring:'14项0-4',scoreRange:'0-56',interpretation:'>14焦虑',notes:'他评量表'},
+  {key:'HAMD',name:'HAMD',fullName:'HAMD汉密尔顿抑郁(17项)',category:'心理状态',purpose:'抑郁严重度',audience:'抑郁患者',scoring:'17项0-2/4',scoreRange:'0-52',interpretation:'>17抑郁',notes:'他评量表'},
+  {key:'LOTCA',name:'LOTCA',fullName:'LOTCA认知评估',category:'心理状态',purpose:'认知综合评估',audience:'脑伤患者',scoring:'定向/知觉/视运动/思维',scoreRange:'分项',interpretation:'分项评估',notes:'认知综合'},
+  {key:'DigitSpan',name:'数字广度',fullName:'数字广度测试',category:'心理状态',purpose:'注意记忆',audience:'认知评估',scoring:'顺背/倒背位数',scoreRange:'位数',interpretation:'位数越高越好',notes:'注意记忆'},
+  {key:'TMT',name:'TMT',fullName:'连线测试',category:'心理状态',purpose:'执行功能',audience:'认知评估',scoring:'A数字连，B数字字母交替，计秒',scoreRange:'秒',interpretation:'耗时越长执行功能越差',notes:'执行功能'},
+  /* 心肺评估 */
+  {key:'Walk6Min',name:'6分钟步行',fullName:'6分钟步行试验',category:'心肺评估',purpose:'心肺耐力',audience:'心肺疾病',scoring:'6分钟步行距离',scoreRange:'米',interpretation:'<150重度心功能不全；150-300中度；300-450轻度；>450正常',notes:'心肺耐力评估',interactive:true}
+];
+/* 量表分类（按文档12大类 + 全部 + 自定义） */
+var SCALE_CATEGORIES=['全部','疼痛评估','颈肩评估','腰背评估','上肢评估','腕手评估','下肢评估','踝足评估','功能与生活能力','平衡与步行','生活质量','肌肉与关节功能','心理状态','心肺评估','自定义'];
 
 /* Treatment item library */
 var TREATMENT_ITEMS={
   '物理因子治疗':[
-    {name:'电疗(TENS/干扰电)',video:'https://www.bilibili.com/video/BV1xW411w7w9'},
-    {name:'热疗(红外/湿热)',video:''},
-    {name:'冷疗',video:''},
-    {name:'超声波',video:''},
-    {name:'激光',video:''},
-    {name:'牵引',video:''}
+    {name:'电疗(TENS/干扰电)'},
+    {name:'热疗(红外/湿热)'},
+    {name:'冷疗'},
+    {name:'超声波'},
+    {name:'激光'},
+    {name:'牵引'}
   ],
   '运动疗法':[
-    {name:'功率自行车',video:''},
-    {name:'肌力训练',video:''},
-    {name:'平衡训练',video:''},
-    {name:'关节活动度训练',video:''},
-    {name:'核心训练',video:''},
-    {name:'步态训练',video:''}
+    {name:'功率自行车'},
+    {name:'肌力训练'},
+    {name:'平衡训练'},
+    {name:'关节活动度训练'},
+    {name:'核心训练'},
+    {name:'步态训练'}
   ],
   '手法治疗':[
-    {name:'肌筋膜松解',video:''},
-    {name:'关节松动(Maitland I-IV级)',video:''},
-    {name:'PNF拉伸',video:''},
-    {name:'按摩',video:''}
+    {name:'肌筋膜松解'},
+    {name:'关节松动(Maitland I-IV级)'},
+    {name:'PNF拉伸'},
+    {name:'按摩'}
   ],
   '东营市康复医疗收费项目':[
-    {name:'意识障碍康复训练',code:'0152000001000',unit:'半小时',price3:63,price2:60,price1:57,video:''},
-    {name:'意识障碍训练-每增加10分钟(加)',code:'0152000001001',unit:'10分钟',price3:21,price2:20,price1:19,video:''},
-    {name:'意识障碍训练-人工智能辅助训练(扩展)',code:'0152000001010',unit:'半小时',price3:63,price2:60,price1:57,video:''},
-    {name:'认知功能训练',code:'0152000002000',unit:'半小时',price3:70.5,price2:67.5,price1:66,video:''},
-    {name:'认知功能训练-每增加10分钟(加)',code:'0152000002001',unit:'10分钟',price3:23.5,price2:22.5,price1:22,video:''},
-    {name:'认知功能训练-人工智能辅助训练(扩展)',code:'0152000002010',unit:'半小时',price3:70.5,price2:67.5,price1:66,video:''},
-    {name:'吞咽功能训练',code:'0152000003000',unit:'半小时',price3:66,price2:58,price1:54,video:''},
-    {name:'吞咽功能训练-每增加10分钟(加)',code:'0152000003001',unit:'10分钟',price3:22,price2:19,price1:18,video:''},
-    {name:'吞咽功能训练-人工智能辅助训练(扩展)',code:'0152000003010',unit:'半小时',price3:66,price2:58,price1:54,video:''},
-    {name:'言语功能训练',code:'0152000004000',unit:'半小时',price3:66,price2:63,price1:60,video:''},
-    {name:'言语功能训练-每增加10分钟(加)',code:'0152000004001',unit:'10分钟',price3:22,price2:21,price1:20,video:''},
-    {name:'言语功能训练-人工智能辅助训练(扩展)',code:'0152000004010',unit:'半小时',price3:66,price2:63,price1:60,video:''},
-    {name:'运动功能训练',code:'0152000005000',unit:'半小时',price3:66,price2:63,price1:60,video:''},
-    {name:'运动功能训练-每增加10分钟(加)',code:'0152000005001',unit:'10分钟',price3:22,price2:21,price1:20,video:''},
-    {name:'运动功能训练-水中运动(加)',code:'0152000005011',unit:'半小时',price3:33,price2:31.5,price1:30,video:''},
-    {name:'运动功能训练-人工智能辅助训练(扩展)',code:'0152000005010',unit:'半小时',price3:66,price2:63,price1:60,video:''},
-    {name:'膀胱功能训练',code:'0152000006000',unit:'半小时',price3:66,price2:57,price1:54,video:''},
-    {name:'膀胱功能训练-人工智能辅助训练(扩展)',code:'0152000006010',unit:'半小时',price3:66,price2:57,price1:54,video:''},
-    {name:'辅助器具使用训练',code:'0152000007000',unit:'半小时',price3:20,price2:19,price1:0,video:''},
-    {name:'辅助器具使用训练-人工智能辅助',code:'0152000007010',unit:'半小时',price3:21,price2:20,price1:19,video:''},
-    {name:'生活技能康复训练',code:'0152000008000',unit:'半小时',price3:66,price2:63,price1:60,video:''},
-    {name:'生活技能康复训练-每增加10分钟(加)',code:'0152000008001',unit:'10分钟',price3:22,price2:21,price1:20,video:''},
-    {name:'生活技能康复训练-人工智能辅助(扩展)',code:'0152000008010',unit:'半小时',price3:66,price2:63,price1:60,video:''},
-    {name:'职业技能康复训练',code:'0152000009000',unit:'半小时',price3:72,price2:67.5,price1:60,video:''},
-    {name:'职业技能康复训练-每增加10分钟(加)',code:'0152000009001',unit:'10分钟',price3:24,price2:22.5,price1:21,video:''},
-    {name:'职业技能康复训练-人工智能辅助(扩展)',code:'0152000009010',unit:'半小时',price3:72,price2:67.5,price1:60,video:''},
-    {name:'神经发育障碍康复训练(个体)',code:'0152000010000',unit:'半小时',price3:78.5,price2:70.5,price1:66,video:''},
-    {name:'神经发育障碍康复训练(个体)-每增加10分钟(加)',code:'0152000010001',unit:'10分钟',price3:25,price2:23.5,price1:22,video:''},
-    {name:'神经发育障碍康复训练(个体)-人工智能辅助(扩展)',code:'0152000010010',unit:'半小时',price3:78.5,price2:70.5,price1:66,video:''},
-    {name:'神经发育障碍康复训练(团体)',code:'0152000011000',unit:'半小时',price3:42,price2:39,price1:36,video:''},
-    {name:'神经发育障碍康复训练(团体)-每增加10分钟(加)',code:'0152000011001',unit:'10分钟',price3:14,price2:13,price1:12,video:''},
-    {name:'神经发育障碍康复训练(团体)-人工智能辅助(扩展)',code:'0152000011010',unit:'半小时',price3:42,price2:39,price1:36,video:''},
-    {name:'认知功能检查',code:'0151000010000',unit:'次',price3:29.5,price2:28,price1:26.5,video:''},
-    {name:'认知功能检查-人工智能辅助检查(扩展)',code:'0151000010100',unit:'次',price3:29.5,price2:28,price1:26.5,video:''},
-    {name:'吞咽功能检查',code:'0151000013000',unit:'次',price3:28.5,price2:27,price1:25.5,video:''},
-    {name:'吞咽功能检查-人工智能辅助检查(扩展)',code:'01510000130100',unit:'次',price3:28.5,price2:27,price1:25.5,video:''},
-    {name:'言语功能检查',code:'0151000014000',unit:'次',price3:33.5,price2:32,price1:30.5,video:''},
-    {name:'言语功能检查-人工智能辅助检查(扩展)',code:'01510000140100',unit:'次',price3:33.5,price2:32,price1:30.5,video:''},
-    {name:'运动功能检查',code:'0151000015000',unit:'次',price3:45,price2:42.5,price1:40,video:''},
-    {name:'运动功能检查-人工智能辅助检查(扩展)',code:'01510000150100',unit:'次',price3:45,price2:42.5,price1:40,video:''},
-    {name:'肢体功能检查',code:'0151000016000',unit:'次',price3:45,price2:42.5,price1:40,video:''},
-    {name:'肢体功能检查-人工智能辅助检查(扩展)',code:'01510000160100',unit:'次',price3:45,price2:42.5,price1:40,video:''},
-    {name:'神经发育障碍检查',code:'0151000017000',unit:'次',price3:27,price2:25.5,price1:24,video:''},
-    {name:'神经发育障碍检查-人工智能辅助检查(扩展)',code:'01510000170100',unit:'次',price3:27,price2:25.5,price1:24,video:''}
+    {name:'意识障碍康复训练',code:'0152000001000',unit:'半小时',price3:63,price2:60,price1:57},
+    {name:'意识障碍训练-每增加10分钟(加)',code:'0152000001001',unit:'10分钟',price3:21,price2:20,price1:19},
+    {name:'意识障碍训练-人工智能辅助训练(扩展)',code:'0152000001010',unit:'半小时',price3:63,price2:60,price1:57},
+    {name:'认知功能训练',code:'0152000002000',unit:'半小时',price3:70.5,price2:67.5,price1:66},
+    {name:'认知功能训练-每增加10分钟(加)',code:'0152000002001',unit:'10分钟',price3:23.5,price2:22.5,price1:22},
+    {name:'认知功能训练-人工智能辅助训练(扩展)',code:'0152000002010',unit:'半小时',price3:70.5,price2:67.5,price1:66},
+    {name:'吞咽功能训练',code:'0152000003000',unit:'半小时',price3:66,price2:58,price1:54},
+    {name:'吞咽功能训练-每增加10分钟(加)',code:'0152000003001',unit:'10分钟',price3:22,price2:19,price1:18},
+    {name:'吞咽功能训练-人工智能辅助训练(扩展)',code:'0152000003010',unit:'半小时',price3:66,price2:58,price1:54},
+    {name:'言语功能训练',code:'0152000004000',unit:'半小时',price3:66,price2:63,price1:60},
+    {name:'言语功能训练-每增加10分钟(加)',code:'0152000004001',unit:'10分钟',price3:22,price2:21,price1:20},
+    {name:'言语功能训练-人工智能辅助训练(扩展)',code:'0152000004010',unit:'半小时',price3:66,price2:63,price1:60},
+    {name:'运动功能训练',code:'0152000005000',unit:'半小时',price3:66,price2:63,price1:60},
+    {name:'运动功能训练-每增加10分钟(加)',code:'0152000005001',unit:'10分钟',price3:22,price2:21,price1:20},
+    {name:'运动功能训练-水中运动(加)',code:'0152000005011',unit:'半小时',price3:33,price2:31.5,price1:30},
+    {name:'运动功能训练-人工智能辅助训练(扩展)',code:'0152000005010',unit:'半小时',price3:66,price2:63,price1:60},
+    {name:'膀胱功能训练',code:'0152000006000',unit:'半小时',price3:66,price2:57,price1:54},
+    {name:'膀胱功能训练-人工智能辅助训练(扩展)',code:'0152000006010',unit:'半小时',price3:66,price2:57,price1:54},
+    {name:'辅助器具使用训练',code:'0152000007000',unit:'半小时',price3:20,price2:19,price1:0},
+    {name:'辅助器具使用训练-人工智能辅助',code:'0152000007010',unit:'半小时',price3:21,price2:20,price1:19},
+    {name:'生活技能康复训练',code:'0152000008000',unit:'半小时',price3:66,price2:63,price1:60},
+    {name:'生活技能康复训练-每增加10分钟(加)',code:'0152000008001',unit:'10分钟',price3:22,price2:21,price1:20},
+    {name:'生活技能康复训练-人工智能辅助(扩展)',code:'0152000008010',unit:'半小时',price3:66,price2:63,price1:60},
+    {name:'职业技能康复训练',code:'0152000009000',unit:'半小时',price3:72,price2:67.5,price1:60},
+    {name:'职业技能康复训练-每增加10分钟(加)',code:'0152000009001',unit:'10分钟',price3:24,price2:22.5,price1:21},
+    {name:'职业技能康复训练-人工智能辅助(扩展)',code:'0152000009010',unit:'半小时',price3:72,price2:67.5,price1:60},
+    {name:'神经发育障碍康复训练(个体)',code:'0152000010000',unit:'半小时',price3:78.5,price2:70.5,price1:66},
+    {name:'神经发育障碍康复训练(个体)-每增加10分钟(加)',code:'0152000010001',unit:'10分钟',price3:25,price2:23.5,price1:22},
+    {name:'神经发育障碍康复训练(个体)-人工智能辅助(扩展)',code:'0152000010010',unit:'半小时',price3:78.5,price2:70.5,price1:66},
+    {name:'神经发育障碍康复训练(团体)',code:'0152000011000',unit:'半小时',price3:42,price2:39,price1:36},
+    {name:'神经发育障碍康复训练(团体)-每增加10分钟(加)',code:'0152000011001',unit:'10分钟',price3:14,price2:13,price1:12},
+    {name:'神经发育障碍康复训练(团体)-人工智能辅助(扩展)',code:'0152000011010',unit:'半小时',price3:42,price2:39,price1:36},
+    {name:'认知功能检查',code:'0151000010000',unit:'次',price3:29.5,price2:28,price1:26.5},
+    {name:'认知功能检查-人工智能辅助检查(扩展)',code:'0151000010100',unit:'次',price3:29.5,price2:28,price1:26.5},
+    {name:'吞咽功能检查',code:'0151000013000',unit:'次',price3:28.5,price2:27,price1:25.5},
+    {name:'吞咽功能检查-人工智能辅助检查(扩展)',code:'01510000130100',unit:'次',price3:28.5,price2:27,price1:25.5},
+    {name:'言语功能检查',code:'0151000014000',unit:'次',price3:33.5,price2:32,price1:30.5},
+    {name:'言语功能检查-人工智能辅助检查(扩展)',code:'01510000140100',unit:'次',price3:33.5,price2:32,price1:30.5},
+    {name:'运动功能检查',code:'0151000015000',unit:'次',price3:45,price2:42.5,price1:40},
+    {name:'运动功能检查-人工智能辅助检查(扩展)',code:'01510000150100',unit:'次',price3:45,price2:42.5,price1:40},
+    {name:'肢体功能检查',code:'0151000016000',unit:'次',price3:45,price2:42.5,price1:40},
+    {name:'肢体功能检查-人工智能辅助检查(扩展)',code:'01510000160100',unit:'次',price3:45,price2:42.5,price1:40},
+    {name:'神经发育障碍检查',code:'0151000017000',unit:'次',price3:27,price2:25.5,price1:24},
+    {name:'神经发育障碍检查-人工智能辅助检查(扩展)',code:'01510000170100',unit:'次',price3:27,price2:25.5,price1:24}
   ]
 };
 
@@ -2595,9 +2698,12 @@ function exportExcel(){
     if(!sl||!sl.length)return;
     sl.forEach(function(s){
       var bg=scaleRowIdx%2===0?'#ffffff':'#f7fafc';scaleRowIdx++;
+      var sd=SCALE_DEFINITIONS[s.scaleType];
+      var libItem=SCALE_LIBRARY.filter(function(x){return x.key===s.scaleType})[0];
+      var scaleName=sd?sd.name:(libItem?libItem.fullName:(s.scaleType||'-'));
       html+='<tr style="background:'+bg+'">';
       html+='<td>'+escapeHtml(p?p.name:pid)+'</td>';
-      html+='<td>'+escapeHtml(s.scaleType||'-')+'</td>';
+      html+='<td>'+escapeHtml(scaleName)+'</td>';
       html+='<td>'+escapeHtml(s.score!=null?s.score:'-')+'</td>';
       html+='<td>'+escapeHtml(s.conclusion||'-')+'</td>';
       html+='<td>'+escapeHtml(fmtTime(s.date))+'</td>';
@@ -3205,7 +3311,6 @@ routes['/special-exam/:id']=function(id){
       bodyHtml+='<div class="exam-row"><div class="ex-name">'+escapeHtml(e.name)+'</div>'+
         '<div class="ex-result">'+resultHtml+'</div>'+
         '<input class="ex-note" placeholder="备注" value="'+escapeHtml(cur.note||'')+'" data-note="'+idx+'">'+
-        (e.video?'<span class="ex-video" data-video="'+escapeHtml(e.video)+'">▶ 观看示范</span>':'')+
         '</div>';
     });
     bodyHtml+='</div>';
@@ -3217,7 +3322,6 @@ routes['/special-exam/:id']=function(id){
     '<div class="card"><div class="card-title">自定义检查项</div>'+
       '<div class="form-group"><label>名称</label><input id="ce_name" placeholder="检查项目名称"></div>'+
       '<div class="form-group"><label>分类</label><input id="ce_cat" placeholder="如：肩关节"></div>'+
-      '<div class="form-group"><label>视频链接（可选）</label><input id="ce_video" placeholder="https://..."></div>'+
       '<button class="btn btn-ghost" id="ce_add">+ 添加自定义检查项</button>'+
     '</div>'+
     '<button class="btn" id="se_save" style="margin-top:8px">💾 保存检查结果</button>'+
@@ -3236,18 +3340,13 @@ routes['/special-exam/:id']=function(id){
       this.classList.add('checked');
     };
   });
-  // video buttons
-  document.querySelectorAll('.ex-video').forEach(function(el){
-    el.onclick=function(e){e.stopPropagation();var v=el.getAttribute('data-video');if(v)window.open(v,'_blank')};
-  });
   // add custom exam
   document.getElementById('ce_add').onclick=function(){
     var nm=document.getElementById('ce_name').value.trim();
     var ct=document.getElementById('ce_cat').value.trim()||'其他';
-    var vd=document.getElementById('ce_video').value.trim();
     if(!nm){toast('请输入名称');return}
     var arr=getCustomExams();
-    arr.push({name:nm,category:ct,video:vd});
+    arr.push({name:nm,category:ct});
     if(!setCustomExams(arr)){toast('⚠️ 保存失败：存储空间不足');return}
     toast('已添加，请重新选择结果并保存');
     route('/special-exam/'+id);
@@ -3262,7 +3361,7 @@ routes['/special-exam/:id']=function(id){
       var note=noteEl?noteEl.value.trim():'';
       // only save if has a result other than unchecked or has note
       if(res!=='unchecked'||note){
-        list.push({examName:e.name,category:e.category,result:res,note:note,video:e.video,date:Date.now()});
+        list.push({examName:e.name,category:e.category,result:res,note:note,date:Date.now()});
       }
     });
     clearDirty();
@@ -3305,7 +3404,7 @@ routes['/scales/:id']=function(id){
     '<div class="sc-conclusion" id="sl_mpq_c">PRI总分 0 - 轻度疼痛</div>'+
     '<button class="btn-mini" id="sl_mpq_save" style="margin-top:8px">保存本次</button></div>';
   // Barthel
-  formsHtml+='<div class="scale-card" data-scale="Barthel" data-cat="运动功能评估"><div class="sc-name"><span>Barthel指数</span><span class="tag">运动功能评估</span></div>'+
+  formsHtml+='<div class="scale-card" data-scale="Barthel" data-cat="功能与生活能力"><div class="sc-name"><span>Barthel指数</span><span class="tag">功能与生活能力</span></div>'+
     '<div id="barthel_list"></div><div class="sc-conclusion" id="sl_bar_c">总分：0 / 100 - 完全依赖（≤20分）</div>'+
     '<button class="btn-mini" id="sl_bar_save" style="margin-top:8px">保存本次</button></div>';
   // Walk6Min
@@ -3329,17 +3428,53 @@ routes['/scales/:id']=function(id){
     histHtml='<div id="hist_list">';
     history.forEach(function(h){
       var sd=SCALE_DEFINITIONS[h.scaleType];
-      var sname=sd?sd.name:(h.scaleType||'量表');
+      var libItem=SCALE_LIBRARY.filter(function(x){return x.key===h.scaleType})[0];
+      var sname=sd?sd.name:(libItem?libItem.fullName:(h.scaleType||'量表'));
       histHtml+='<div class="record-card" data-hid="'+h.date+'"><div class="record-info"><div class="rn">'+escapeHtml(sname)+'</div><div class="rm">得分：'+escapeHtml(h.score)+' · '+escapeHtml(h.conclusion)+'</div><div class="rt">'+fmtTime(h.date)+'</div></div></div>';
     });
     histHtml+='</div>';
   }
 
+  /* 快速评分记录 + 量表库参考（按用户文档：覆盖71个标准化量表，12大分类） */
+  var groupedCats={};
+  SCALE_LIBRARY.forEach(function(s){if(!groupedCats[s.category])groupedCats[s.category]=[];groupedCats[s.category].push(s)});
+  // 量表库下拉（按分类分组）
+  var quickScaleOpts='';
+  Object.keys(groupedCats).forEach(function(cat){
+    quickScaleOpts+='<optgroup label="'+escapeHtml(cat)+'">';
+    groupedCats[cat].forEach(function(s){
+      quickScaleOpts+='<option value="'+s.key+'">'+escapeHtml(s.fullName)+'（'+escapeHtml(s.scoreRange)+'）</option>';
+    });
+    quickScaleOpts+='</optgroup>';
+  });
+  // 量表库参考（分组折叠展示）
+  var libRefHtml='';
+  Object.keys(groupedCats).forEach(function(cat){
+    libRefHtml+='<div class="lib-cat"><div class="lib-cat-hd"><span class="arrow">▾</span> '+escapeHtml(cat)+'（'+groupedCats[cat].length+'个）</div><div class="lib-cat-bd">';
+    groupedCats[cat].forEach(function(s){
+      libRefHtml+='<div class="lib-item"><div class="li-name">'+escapeHtml(s.fullName)+' <span class="tag">'+escapeHtml(s.scoreRange)+'</span>'+((s.interactive)?' <span class="tag" style="background:#c6f6d5;color:#276749">交互表单</span>':'')+'</div>'+
+        '<div class="li-row"><b>目的：</b>'+escapeHtml(s.purpose)+' · <b>适用：</b>'+escapeHtml(s.audience)+'</div>'+
+        '<div class="li-row"><b>评分方法：</b>'+escapeHtml(s.scoring)+'</div>'+
+        '<div class="li-row"><b>得分解读：</b>'+escapeHtml(s.interpretation)+'</div>'+
+        (s.notes?'<div class="li-row" style="color:#888"><b>备注：</b>'+escapeHtml(s.notes)+'</div>':'')+
+        '</div>';
+    });
+    libRefHtml+='</div></div>';
+  });
+
   app.innerHTML='<div class="page no-print">'+
     '<div class="page-header"><h2>量表评估</h2><p>'+escapeHtml(p.name)+'</p></div>'+
     '<div class="card"><div class="card-title">分类筛选</div><div class="chip-row">'+chipsHtml+'</div></div>'+
-    '<div class="card"><div class="card-title">量表填写</div>'+formsHtml+'</div>'+
+    '<div class="card"><div class="card-title">量表填写（专属交互表单）</div>'+formsHtml+'</div>'+
+    '<div class="card"><div class="card-title">快速评分记录（量表库任选'+SCALE_LIBRARY.length+'个量表）</div>'+
+      '<div class="form-group"><label>选择量表</label><select id="qr_scale"><option value="">请选择量表…</option>'+quickScaleOpts+'</select></div>'+
+      '<div id="qr_info" class="lib-info" style="display:none"></div>'+
+      '<div class="form-group"><label>得分/结果</label><input id="qr_score" placeholder="如：7 / 65% / I期 / 阳性"></div>'+
+      '<div class="form-group"><label>结论（可留空，自动参考解读）</label><input id="qr_concl" placeholder="如：中度疼痛"></div>'+
+      '<button class="btn" id="qr_save">💾 保存评分记录</button>'+
+    '</div>'+
     '<div class="card"><div class="card-title">历史评估记录</div>'+histHtml+'</div>'+
+    '<div class="card"><div class="card-title">量表库参考（'+SCALE_LIBRARY.length+'个标准化量表 · 按文档12大分类）</div>'+libRefHtml+'</div>'+
     '<div class="card"><div class="card-title">自定义量表 <button class="btn-mini" id="cs_add">+ 新建</button></div>'+
       '<div class="form-group"><label>量表名称</label><input id="cs_name" placeholder="量表名称"></div>'+
       '<div class="form-group"><label>分类</label><input id="cs_cat" placeholder="如：平衡评估" value="自定义"></div>'+
@@ -3358,6 +3493,48 @@ routes['/scales/:id']=function(id){
         var scat=sc.getAttribute('data-cat');
         sc.style.display=(cat==='全部'||scat===cat)?'':'none';
       });
+    };
+  });
+
+  // 快速评分记录：选择量表后展示其评分方法与解读参考
+  var qrScale=document.getElementById('qr_scale');
+  var qrInfo=document.getElementById('qr_info');
+  function showQrInfo(s){
+    if(!s){qrInfo.style.display='none';return}
+    qrInfo.style.display='block';
+    qrInfo.innerHTML='<div class="li-row"><b>目的：</b>'+escapeHtml(s.purpose)+' · <b>适用：</b>'+escapeHtml(s.audience)+'</div>'+
+      '<div class="li-row"><b>评分方法：</b>'+escapeHtml(s.scoring)+'</div>'+
+      '<div class="li-row"><b>得分范围：</b>'+escapeHtml(s.scoreRange)+'</div>'+
+      '<div class="li-row"><b>解读参考：</b>'+escapeHtml(s.interpretation)+'</div>'+
+      (s.notes?'<div class="li-row" style="color:#888"><b>备注：</b>'+escapeHtml(s.notes)+'</div>':'');
+  }
+  if(qrScale){
+    qrScale.onchange=function(){
+      var key=qrScale.value;
+      var s=SCALE_LIBRARY.filter(function(x){return x.key===key})[0];
+      showQrInfo(s||null);
+    };
+    document.getElementById('qr_save').onclick=function(){
+      var key=qrScale.value;
+      if(!key){toast('请先选择量表');return}
+      var s=SCALE_LIBRARY.filter(function(x){return x.key===key})[0];
+      var score=document.getElementById('qr_score').value.trim();
+      if(!score){toast('请输入得分/结果');return}
+      var concl=document.getElementById('qr_concl').value.trim();
+      if(!concl){concl='参考解读：'+s.interpretation}
+      if(!addScaleRecord(id,{scaleType:key,score:score,conclusion:concl,data:{score:score,scaleKey:key},date:Date.now()})){toast('⚠️ 保存失败：存储空间不足');return}
+      toast(s.fullName+' 已保存');route('/scales/'+id);
+    };
+    wrapSave('qr_save');
+  }
+
+  // 量表库参考：分类折叠/展开
+  document.querySelectorAll('.lib-cat-hd').forEach(function(hd){
+    hd.onclick=function(){
+      var bd=hd.nextElementSibling;
+      var arrow=hd.querySelector('.arrow');
+      if(bd.style.display==='none'){bd.style.display='';arrow.textContent='▾'}
+      else{bd.style.display='none';arrow.textContent='▸'}
     };
   });
 
@@ -3552,7 +3729,8 @@ routes['/scales/:id']=function(id){
         // find all same scaleType records for trend
         var sameType=getScaleList(id).filter(function(h){return h.scaleType===rec.scaleType}).sort(function(a,b){return a.date-b.date});
         var sd=SCALE_DEFINITIONS[rec.scaleType];
-        var sname=sd?sd.name:rec.scaleType;
+        var libItem=SCALE_LIBRARY.filter(function(x){return x.key===rec.scaleType})[0];
+        var sname=sd?sd.name:(libItem?libItem.fullName:rec.scaleType);
         var trendHtml=sameType.map(function(s){return fmtDate(s.date)+': '+s.score+'分'}).join(' → ');
         toast(sname+' 趋势：'+trendHtml);
       }
@@ -3590,7 +3768,6 @@ routes['/plan/:id']=function(id){
       itemsHtml+='<div class="treat-item"><div class="di-hd"><span class="ti-name">'+escapeHtml(it.name)+' <span class="tag">'+escapeHtml(it.category)+'</span></span><span class="di-rm" data-rm-item="'+stage+'_'+idx+'">删除</span></div>'+
         '<div class="ti-meta">'+escapeHtml(metaParts.join(' · '))+'</div>'+
         descHtml+
-        (it.video?'<span class="ti-video" data-vid="'+escapeHtml(it.video)+'">▶ 观看示范</span>':'')+
         '</div>';
     });
     return itemsHtml;
@@ -3635,7 +3812,7 @@ routes['/plan/:id']=function(id){
     function refreshItems(){
       var cat=catSel.value;
       var items=getDYItemsByCategory(cat);
-      itemSel.innerHTML=items.map(function(it){return '<option value="'+escapeHtml(it.name)+'" data-vid="'+escapeHtml(it.video||'')+'" data-unit="'+escapeHtml(it.unit||'')+'">'+escapeHtml(it.name)+(it.unit?'（'+escapeHtml(it.unit)+'）':'')+'</option>'}).join('');
+      itemSel.innerHTML=items.map(function(it){return '<option value="'+escapeHtml(it.name)+'" data-unit="'+escapeHtml(it.unit||'')+'">'+escapeHtml(it.name)+(it.unit?'（'+escapeHtml(it.unit)+'）':'')+'</option>'}).join('');
       updateParamsPlaceholder();
     }
     function updateParamsPlaceholder(){
@@ -3655,8 +3832,7 @@ routes['/plan/:id']=function(id){
       var name=itemSel.value;
       var cat=catSel.value;
       var params=paramsInput.value.trim();
-      var vid=itemSel.options[itemSel.selectedIndex].getAttribute('data-vid');
-      existing[ps.key].items.push({name:name,category:cat,params:params,video:vid||''});
+      existing[ps.key].items.push({name:name,category:cat,params:params});
       paramsInput.value='';
       document.getElementById('items_'+ps.key).innerHTML=renderStage(ps.key);
       bindItemRm();
@@ -3690,9 +3866,6 @@ routes['/plan/:id']=function(id){
         bindItemRm();
       };
     });
-    document.querySelectorAll('[data-vid]').forEach(function(el){
-      el.onclick=function(e){e.stopPropagation();var v=el.getAttribute('data-vid');if(v)window.open(v,'_blank')};
-    });
   }
   bindItemRm();
 
@@ -3710,17 +3883,17 @@ routes['/plan/:id']=function(id){
     if(maxPain>7){
       existing.acute.goal='控制疼痛、减轻炎症';
       var dyTens=findDYPrice('电疗');
-      existing.acute.items.push({name:dyTens?dyTens.name:'运动功能训练',category:dyTens?dyTens.category:'康复训练',params:'镇痛模式',video:''});
+      existing.acute.items.push({name:dyTens?dyTens.name:'运动功能训练',category:dyTens?dyTens.category:'康复训练',params:'镇痛模式'});
     }
     if(minGrade<3){
       existing.subacute.goal='增强肌力';
       var dyMuscle=findDYPrice('运动功能训练');
-      existing.subacute.items.push({name:dyMuscle?dyMuscle.name:'运动功能训练',category:dyMuscle?dyMuscle.category:'康复训练',params:'低负荷 '+minGrade+'级肌力训练',video:''});
+      existing.subacute.items.push({name:dyMuscle?dyMuscle.name:'运动功能训练',category:dyMuscle?dyMuscle.category:'康复训练',params:'低负荷 '+minGrade+'级肌力训练'});
     }
     if(existing.chronic.items.length===0){
       existing.chronic.goal='功能恢复与巩固';
       var dyCore=findDYPrice('运动功能训练');
-      existing.chronic.items.push({name:dyCore?dyCore.name:'运动功能训练',category:dyCore?dyCore.category:'康复训练',params:'循序渐进',video:''});
+      existing.chronic.items.push({name:dyCore?dyCore.name:'运动功能训练',category:dyCore?dyCore.category:'康复训练',params:'循序渐进'});
     }
     PLAN_STAGES.forEach(function(ps){document.getElementById('items_'+ps.key).innerHTML=renderStage(ps.key)});
     bindItemRm();
@@ -3832,7 +4005,8 @@ routes['/report/:id']=function(id){
     Object.keys(latest).forEach(function(k){
       var s=latest[k];
       var sd=SCALE_DEFINITIONS[s.scaleType];
-      var sname=sd?sd.name:s.scaleType;
+      var libItem=SCALE_LIBRARY.filter(function(x){return x.key===s.scaleType})[0];
+      var sname=sd?sd.name:(libItem?libItem.fullName:s.scaleType);
       s4+='<div class="r-row"><div class="rk">'+escapeHtml(sname)+'</div><div class="rv">得分：<b>'+escapeHtml(s.score)+'</b> · '+escapeHtml(s.conclusion)+'</div></div>';
     });
   }
@@ -3949,7 +4123,12 @@ routes['/report/:id']=function(id){
     // 量表
     if(scales&&scales.length){
       text+='\n【量表评估】\n';
-      scales.forEach(function(s){text+=(s.scaleType||'量表')+': '+s.score+'分（'+(s.conclusion||'')+'）\n'});
+      scales.forEach(function(s){
+        var sd=SCALE_DEFINITIONS[s.scaleType];
+        var libItem=SCALE_LIBRARY.filter(function(x){return x.key===s.scaleType})[0];
+        var snm=sd?sd.name:(libItem?libItem.fullName:(s.scaleType||'量表'));
+        text+=snm+': '+s.score+'分（'+(s.conclusion||'')+'）\n';
+      });
     }
     // 方案
     if(plan){
