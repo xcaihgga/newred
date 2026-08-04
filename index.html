@@ -482,6 +482,61 @@ DB.init().catch(function(err){
   toast('⚠️ 照片存储初始化失败，请刷新或清理浏览器存储');
 });
 
+/* ========================= Schema Versioning & Migration ========================= */
+// Bump on any breaking data-structure change. Add a migrate_X_to_Y branch.
+// 存储所有业务数据的 key 白名单，用于清空/体检/诊断导出。
+var SCHEMA_VERSION=3;
+var SCHEMA_KEY='_schema_version';
+var DATA_KEYS=['therapist_profiles','active_profile_id','patients','records','assessments','specialExams','scales','plans','customExams','customScales','userRole','auditLog','pinHash'];
+
+// 返回当前存储 schema 版本（未初始化时为 0）
+function getStoredSchemaVersion(){var v=LS.get(SCHEMA_KEY);return (typeof v==='number'&&v>=0)?v:0}
+
+// 迁移：每次升级写一个明确的 from→to 步骤，幂等、可重入
+function migrateSchema(from,to){
+  var log=[];
+  function step(cur,fn){
+    if(from<=cur&&to>cur){try{fn();log.push('v'+(cur+1)+':ok')}catch(e){log.push('v'+(cur+1)+':fail '+e.message)}}
+  }
+  // v0→1: 旧版无 schema，确保 auditLog/pinHash 容器存在
+  step(0,function(){
+    if(!LS.get('auditLog'))LS.set('auditLog',[]);
+    if(!LS.get('pinHash'))LS.set('pinHash','');
+  });
+  // v1→2: records 缺字段补默认（向后兼容旧导出）
+  step(1,function(){
+    var rs=getRecords();
+    rs.forEach(function(r){
+      if(typeof r.photoId==='undefined')r.photoId=null;
+      if(typeof r.timestamp!=='number')r.timestamp=Date.now();
+    });
+    setRecords(rs);
+  });
+  // v2→3: patients 缺 createdBy 标记为 'legacy'（便于权限判定）
+  step(2,function(){
+    var ps=getPatients();
+    ps.forEach(function(p){if(!p.createdBy)p.createdBy='legacy'});
+    setPatients(ps);
+  });
+  LS.set(SCHEMA_KEY,to);
+  console.log('[schema] migrated',from,'→',to,'|',log.join(', '));
+  return log;
+}
+
+// 启动时自动迁移（包在 try 内，失败不影响加载）
+function ensureSchemaMigrated(){
+  try{
+    var cur=getStoredSchemaVersion();
+    if(cur===SCHEMA_VERSION){return{ok:true,from:cur,to:cur,log:['noop']}}
+    var before=cur;
+    var log=migrateSchema(cur,SCHEMA_VERSION);
+    return{ok:true,from:before,to:SCHEMA_VERSION,log:log};
+  }catch(e){
+    console.error('[schema] migration failed:',e);
+    return{ok:false,error:e.message};
+  }
+}
+
 /* ========================= Data Accessors ========================= */
 function getProfiles(){return LS.get('therapist_profiles')||[]}
 function setProfiles(p){return LS.set('therapist_profiles',p)}
@@ -563,6 +618,113 @@ function getUserRole(){return LS.get('userRole')||'therapist'}
 function setUserRole(r){return LS.set('userRole',r)}
 function getRoleName(r){r=r||getUserRole();return {therapist:'治疗师',director:'主任',admin:'管理员'}[r]||'治疗师'}
 
+/* ========================= Audit Log ========================= */
+// 环形缓冲，最多 500 条；高危操作必经此入口。
+var AUDIT_MAX=500;
+function getAuditLog(){return LS.get('auditLog')||[]}
+function setAuditLog(a){return LS.set('auditLog',a)}
+function audit(action,detail){
+  try{
+    var log=getAuditLog();
+    var ap=getActiveProfile();
+    log.unshift({
+      t:Date.now(),
+      actor:ap?(ap.name||'(未命名)'):'(系统)',
+      actorId:ap?ap.id:'',
+      role:getUserRole(),
+      action:String(action||'').slice(0,64),
+      detail:typeof detail==='string'?detail.slice(0,512):JSON.stringify(detail).slice(0,512)
+    });
+    while(log.length>AUDIT_MAX)log.pop();
+    setAuditLog(log);
+  }catch(e){console.error('[audit] failed:',e)}
+}
+function clearAuditLog(){setAuditLog([]);audit('audit.clear','审计日志已清空')}
+
+/* ========================= PIN Protection ========================= */
+// 简易哈希（非加密强，但避免明文存 PIN）。PIN 仅前端拦截误操作，不可信。
+function pinHash(pin){
+  var h=simpleHash('pin_salt_9f3a2::'+String(pin));
+  return h;
+}
+function getPinHash(){return LS.get('pinHash')||''}
+function isPinSet(){return !!getPinHash()}
+function setPin(pin){
+  var h=pin?pinHash(pin):'';
+  if(!LS.set('pinHash',h))return false;
+  return true;
+}
+function verifyPin(pin){var h=getPinHash();if(!h)return true;return pinHash(pin)===h}
+
+// PIN 输入弹窗。title=提示，cb=通过回调，onCancel=取消回调
+function showPinInput(title,cb,onCancel){
+  var mask=document.createElement('div');
+  mask.className='modal-mask';
+  mask.innerHTML='<div class="modal" style="max-width:340px"><div class="modal-hd"><span>'+escapeHtml(title)+'</span><span class="close">&times;</span></div>'+
+    '<div class="modal-bd"><input id="pin_input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="请输入 PIN 码" style="width:100%;padding:12px;font-size:18px;text-align:center;letter-spacing:8px;border:1px solid #e2e8f0;border-radius:6px"></div>'+
+    '<div class="modal-ft"><button class="btn btn-ghost" id="pin_cancel">取消</button><button class="btn" id="pin_ok">确定</button></div></div>';
+  document.body.appendChild(mask);
+  var inp=mask.querySelector('#pin_input');
+  setTimeout(function(){inp.focus()},50);
+  function close(){mask.remove()}
+  function ok(){
+    var v=inp.value.trim();
+    if(!v){toast('请输入 PIN');return}
+    if(verifyPin(v)){close();cb();}else{toast('PIN 码错误');inp.value='';inp.focus();}
+  }
+  mask.querySelector('.close').onclick=function(){close();if(onCancel)onCancel()};
+  mask.querySelector('#pin_cancel').onclick=function(){close();if(onCancel)onCancel()};
+  mask.querySelector('#pin_ok').onclick=ok;
+  inp.onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();ok()}};
+  mask.onclick=function(e){if(e.target===mask){close();if(onCancel)onCancel()}};
+}
+
+// 设置/修改 PIN 弹窗。change=true 时要求先验证旧 PIN
+function showPinDialog(change){
+  if(change&&!isPinSet()){change=false}
+  if(change){
+    showPinInput('请输入当前 PIN 码',function(){
+      _showSetPinForm();
+    },function(){toast('已取消')});
+  }else{
+    _showSetPinForm();
+  }
+  function _showSetPinForm(){
+    var mask=document.createElement('div');
+    mask.className='modal-mask';
+    mask.innerHTML='<div class="modal" style="max-width:340px"><div class="modal-hd"><span>'+(change?'修改 PIN 码':'设置 PIN 码')+'</span><span class="close">&times;</span></div>'+
+      '<div class="modal-bd">'+
+        '<input id="pin_new1" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="4-8 位数字" style="width:100%;padding:12px;font-size:16px;text-align:center;letter-spacing:4px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:10px">'+
+        '<input id="pin_new2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="再次输入" style="width:100%;padding:12px;font-size:16px;text-align:center;letter-spacing:4px;border:1px solid #e2e8f0;border-radius:6px">'+
+      '</div>'+
+      '<div class="modal-ft"><button class="btn btn-ghost" id="pin_new_cancel">取消</button><button class="btn" id="pin_new_ok">保存</button></div></div>';
+    document.body.appendChild(mask);
+    var i1=mask.querySelector('#pin_new1'),i2=mask.querySelector('#pin_new2');
+    setTimeout(function(){i1.focus()},50);
+    function close(){mask.remove()}
+    function ok(){
+      var v1=i1.value.trim(),v2=i2.value.trim();
+      if(!/^\d{4,8}$/.test(v1)){toast('PIN 必须是 4-8 位数字');return}
+      if(v1!==v2){toast('两次输入不一致');return}
+      if(!setPin(v1)){toast('⚠️ 保存失败：存储空间不足');return}
+      audit('pin.set',change?'change':'setup');
+      toast(change?'PIN 已修改':'PIN 已设置');
+      close();
+      route('/settings');
+    }
+    mask.querySelector('.close').onclick=close;
+    mask.querySelector('#pin_new_cancel').onclick=close;
+    mask.querySelector('#pin_new_ok').onclick=ok;
+    i2.onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();ok()}};
+  }
+}
+
+// 高危操作门禁：未设 PIN 直接通过；已设 PIN 弹窗验证
+function requirePinIfLocked(cb,onCancel){
+  if(!isPinSet()){cb();return}
+  showPinInput('请输入 PIN 码以确认',cb,onCancel);
+}
+
 /* Permission check */
 function canDeletePatient(p){
   var role=getUserRole();
@@ -614,6 +776,9 @@ function deletePatientData(pid){
   if(!LS.set('scales',sc)){rollback();return false}
   var pl=bak_plans;delete pl[pid];
   if(!LS.set('plans',pl)){rollback();return false}
+  // 审计：删除成功后记录
+  var deleted=bak_patients.filter(function(p){return p.id===pid})[0];
+  audit('patient.delete',{id:pid,name:deleted?deleted.name:'',records:toDel.length});
   return true;
 }
 
@@ -1091,6 +1256,78 @@ function bindDirtyGuard(root){
   });
 }
 
+/* ========================= Global Error Boundary ========================= */
+var _lastError=null;
+// 路由 handler 异常时渲染错误页，避免白屏
+function renderErrorPage(err,path){
+  _lastError={err:String(err&&err.message||err),stack:String(err&&err.stack||''),path:String(path||''),t:Date.now(),ua:navigator.userAgent,schema:getStoredSchemaVersion(),codeVer:SCHEMA_VERSION};
+  console.error('[route] error:',err);
+  try{audit('error.route',{path:String(path||'').slice(0,40),msg:String(err&&err.message||err).slice(0,80)})}catch(_){}
+  var app=document.getElementById('app');
+  if(!app)return;
+  app.innerHTML='<div class="page"><div class="page-header" style="background:linear-gradient(135deg,#e53e3e,#c53030)"><h2>页面出错</h2><p>路由：'+escapeHtml(path||'')+'</p></div>'+
+    '<div class="card"><div class="card-title">错误信息</div><div style="font-family:monospace;font-size:12px;color:#c53030;background:#fff5f5;padding:8px;border-radius:4px;word-break:break-all;white-space:pre-wrap">'+escapeHtml(_lastError.err)+'\n\n'+escapeHtml(_lastError.stack)+'</div></div>'+
+    '<div class="card"><div class="card-title">操作建议</div>'+
+    '<p style="font-size:13px;color:#555;margin-bottom:8px">1. 尝试刷新页面；若反复出现请导出诊断包反馈开发者。</p>'+
+    '<p style="font-size:13px;color:#555;margin-bottom:8px">2. 业务数据仍保存在本地，可导出备份后清理浏览器存储。</p>'+
+    '<p style="font-size:13px;color:#555">3. schema 版本：'+_lastError.schema+' / 代码版本：'+_lastError.codeVer+'</p></div>'+
+    '<button class="btn" id="err_diag" style="margin-bottom:8px">📤 导出诊断包</button>'+
+    '<button class="btn btn-ghost" id="err_home">返回首页</button>'+
+    '<button class="btn btn-ghost" id="err_backup" style="margin-top:8px">先导出数据备份</button>'+
+  '</div>';
+  var dBtn=document.getElementById('err_diag');
+  if(dBtn)dBtn.onclick=function(){exportDiagnosticBundle()};
+  var hBtn=document.getElementById('err_home');
+  if(hBtn)hBtn.onclick=function(){location.hash='';location.reload()};
+  var bBtn=document.getElementById('err_backup');
+  if(bBtn)bBtn.onclick=function(){try{exportFullBackup()}catch(e){toast('备份失败：'+e.message)}};
+}
+
+// 诊断包：错误信息 + localStorage 快照 + schema 信息 + 审计日志最近 50 条
+function exportDiagnosticBundle(){
+  var snap={};
+  try{
+    DATA_KEYS.forEach(function(k){
+      try{snap[k]=LS.get(k)}catch(e){snap[k]='[read error: '+e.message+']'}
+    });
+  }catch(e){snap._error='snapshot failed: '+e.message}
+  var pkg={
+    exportTime:new Date().toISOString(),
+    appVersion:'v2.0',
+    schemaVersion:getStoredSchemaVersion(),
+    codeSchemaVersion:SCHEMA_VERSION,
+    userAgent:navigator.userAgent,
+    lastError:_lastError,
+    localStorageSnapshot:snap,
+    auditLogRecent:(getAuditLog()||[]).slice(0,50),
+    recordsCount:getRecords().length,
+    patientsCount:getPatients().length
+  };
+  var blob=new Blob([JSON.stringify(pkg,null,2)],{type:'application/json'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download='rehab_diagnostic_'+todayStr()+'.json';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){try{URL.revokeObjectURL(url)}catch(_){}},5000);
+  toast('诊断包已下载');
+}
+
+// 全局未捕获异常：同步 throw / 资源加载失败
+window.addEventListener('error',function(e){
+  // 过滤跨域脚本错误（仅有 'Script error.'）
+  var msg=String(e.message||'');
+  if(msg==='Script error.'&&!e.filename)return;
+  try{audit('error.global',{msg:msg.slice(0,80),src:String(e.filename||'').slice(0,40)+':'+(e.lineno||0)})}catch(_){}
+  console.error('[global error]',e);
+});
+// 未处理的 Promise rejection
+window.addEventListener('unhandledrejection',function(e){
+  var reason=e&&e.reason;
+  var msg=String((reason&&reason.message)||reason||'');
+  try{audit('error.promise',{msg:msg.slice(0,80)})}catch(_){}
+  console.error('[unhandledrejection]',reason);
+});
+
 function route(path){
   // path like /camera or /record/:id or /camera?type=...
   var qIdx=path.indexOf('?');
@@ -1108,7 +1345,13 @@ function route(path){
   renderTabbar(key);
   var param=parts[1]?decodeURIComponent(parts[1]):null;
   clearDirty();
-  fn(param,query);
+  // 错误边界：路由 handler 异常不白屏，渲染错误页并提供诊断导出
+  try{
+    fn(param,query);
+  }catch(e){
+    renderErrorPage(e,path);
+    return;
+  }
   // add back button to sub-pages
   var hdr=document.querySelector('.page-header');
   if(hdr && parts[1]){
@@ -1985,13 +2228,25 @@ routes['/settings']=function(){
     '<input type="file" id="set_import_file" accept="application/json" style="display:none">'+
     (isAdmin?'<button class="btn btn-danger" id="set_clear">🗑 清空所有数据</button>':'<div class="alert warn">清空数据需要管理员权限</div>')+
     '</div>'+
+
+    '<div class="card"><div class="card-title">安全与审计 <span class="more" data-go="/audit">查看日志 ›</span></div>'+
+    '<button class="btn btn-ghost" id="set_pin" style="margin-bottom:10px">'+(isPinSet()?'🔒 修改 PIN 码':'🔓 设置 PIN 码（保护高危操作）')+'</button>'+
+    '<div class="alert info">PIN 码保护：切换到主任/管理员角色、清空数据时需输入 PIN。遗忘 PIN 可在「查看日志」页用管理员身份重置。</div>'+
+    '<button class="btn btn-ghost" id="set_audit">📋 查看操作日志</button>'+
+    '</div>'+
     '<div class="card" style="text-align:center;font-size:12px;color:#999"><p>康复评估系统 v2.0</p><p>所有数据保存在本地，不会上传服务器</p></div></div>';
 
   // role change
   document.getElementById('set_role_select').onchange=function(){
-    setUserRole(this.value);
-    toast('角色已切换为：'+getRoleName(this.value));
-    route('/settings');
+    var newRole=this.value;
+    var oldRole=getUserRole();
+    // 切换到 admin/director 需 PIN（若有设置），防止误提权
+    requirePinIfLocked(function(){
+      setUserRole(newRole);
+      audit('role.change',{from:oldRole,to:newRole});
+      toast('角色已切换为：'+getRoleName(newRole));
+      route('/settings');
+    });
   };
 
   // save current identity (edits active profile)
@@ -2080,6 +2335,12 @@ routes['/settings']=function(){
   });
   // export all patients
   document.getElementById('set_expall_patients').onclick=function(){exportAllPatients()};
+  // PIN 设置 / 修改
+  var pinBtn=document.getElementById('set_pin');
+  if(pinBtn)pinBtn.onclick=function(){showPinDialog(false)};
+  // 审计日志
+  var auditBtn=document.getElementById('set_audit');
+  if(auditBtn)auditBtn.onclick=function(){go('/audit')};
 
   // 东营市项目内涵查询功能
   function renderDYPriceList(){
@@ -2137,9 +2398,16 @@ routes['/settings']=function(){
     document.getElementById('set_clear').onclick=function(){
       confirmDialog('将清空所有患者、记录、评估、方案和照片，且不可恢复，确定？',function(){
         confirmDialog('再次确认清空全部数据？',function(){
-          LS.del('therapist_info');LS.del('therapist_profiles');LS.del('active_profile_id');LS.del('patients');LS.del('records');
-          LS.del('assessments');LS.del('specialExams');LS.del('scales');LS.del('plans');LS.del('customExams');LS.del('customScales');LS.del('userRole');
-          DB.clear().then(function(){toast('已清空所有数据');go('/home')}).catch(function(e){toast('清空失败：'+(e&&e.message||''))});
+          // 双重确认后，若设了 PIN 还需 PIN 验证（防他人借机清空）
+          requirePinIfLocked(function(){
+            var beforeCount=getPatients().length+getRecords().length;
+            // 保留审计日志与 PIN，便于事后追责；其它业务 key 全清
+            LS.del('therapist_info');LS.del('therapist_profiles');LS.del('active_profile_id');LS.del('patients');LS.del('records');
+            LS.del('assessments');LS.del('specialExams');LS.del('scales');LS.del('plans');LS.del('customExams');LS.del('customScales');LS.del('userRole');
+            LS.del(SCHEMA_KEY);
+            audit('data.clear',{before:beforeCount+'items'});
+            DB.clear().then(function(){toast('已清空所有数据');go('/home')}).catch(function(e){toast('清空失败：'+(e&&e.message||''))});
+          });
         });
       });
     };
@@ -2470,6 +2738,7 @@ function importFullBackup(data){
   // Anti prototype pollution: reject dangerous keys
   var BAD_KEYS={__proto__:1,constructor:1,prototype:1,hasOwnProperty:1,toString:1,valueOf:1};
   function isSafeKey(k){return !BAD_KEYS[k]&&typeof k==='string'&&k.indexOf('__')!==0}
+  audit('data.import',{patients:data.patients?data.patients.length:0,records:data.records?data.records.length:0,photos:data.photos?data.photos.length:0});
   // merge: patients by id, records by id, others overwrite by key
   if(data.patients){
     var existing=getPatients();
@@ -3651,8 +3920,58 @@ function detectWxWork(){
   }
 }
 
+/* ========================= Audit Log Page ========================= */
+routes['/audit']=function(){
+  var log=getAuditLog();
+  var role=getUserRole();
+  var isAdmin=role==='admin';
+  var body;
+  if(log.length===0){
+    body='<div class="empty"><div class="ei">📋</div>暂无操作记录</div>';
+  }else{
+    body='<div class="patient-select-list" style="max-height:none">';
+    log.forEach(function(e){
+      var d=new Date(e.t);
+      body+='<div class="ps-item" style="padding:8px 10px">'+
+        '<div style="display:flex;justify-content:space-between;font-size:12px;color:#888">'+
+          '<span>'+escapeHtml(fmtTime(e.t))+'</span>'+
+          '<span class="role-badge '+escapeHtml(e.role||'')+'">'+escapeHtml(getRoleName(e.role))+'</span>'+
+        '</div>'+
+        '<div style="font-weight:600;font-size:13px;margin-top:4px">'+escapeHtml(e.action)+'</div>'+
+        '<div style="font-size:12px;color:#666;margin-top:2px">操作人：'+escapeHtml(e.actor)+(e.detail?' · '+escapeHtml(e.detail):'')+'</div>'+
+      '</div>';
+    });
+    body+='</div>';
+  }
+  app.innerHTML='<div class="page"><div class="page-header"><h2>操作日志</h2><p>共 '+log.length+' 条记录（环形缓冲上限 '+AUDIT_MAX+'）</p></div>'+
+    '<div class="card">'+body+'</div>'+
+    (isAdmin?'<button class="btn btn-danger" id="audit_clear" style="margin-top:10px">清空审计日志</button>':'')+
+    '<div class="card" style="font-size:12px;color:#888;text-align:center"><p>记录范围：删除患者 / 角色切换 / 清空数据 / 数据导入</p><p>审计日志独立于业务数据，清空业务数据不会清除审计记录</p></div>'+
+  '</div>';
+  var clr=document.getElementById('audit_clear');
+  if(clr){
+    clr.onclick=function(){
+      confirmDialog('确定清空全部审计日志？此操作本身也会被记录',function(){
+        clearAuditLog();
+        toast('已清空');
+        route('/audit');
+      });
+    };
+  }
+};
+
 /* ========================= Init ========================= */
 function init(){
+  // 1. Schema 迁移（在路由之前，确保数据结构一致）
+  var mig=ensureSchemaMigrated();
+  if(!mig.ok){
+    console.error('[init] schema migration failed:',mig.error);
+    toast('⚠️ 数据迁移失败，请导出备份后联系开发者');
+  }else if(mig.from!==mig.to){
+    console.log('[init] schema',mig.from,'→',mig.to);
+  }
+  // 2. 启动审计（记录一次会话开始，便于追溯）
+  try{audit('app.start',{schema:getStoredSchemaVersion(),patients:getPatients().length,records:getRecords().length})}catch(_){}
   detectWxWork();
   renderTabbar('/home');
   if(!LS.get('onboarded')){
