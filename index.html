@@ -419,12 +419,20 @@ var DB = {
     return this.ready;
   },
   putPhoto:function(id,blob){
+    // Require image/* type to prevent arbitrary blob storage / XSS via blob: URLs
+    if(!blob||!(blob instanceof Blob)){
+      return Promise.reject(new Error('putPhoto: invalid blob'));
+    }
+    if(blob.type&&blob.type.indexOf('image/')!==0){
+      return Promise.reject(new Error('putPhoto: only image/* allowed, got '+blob.type));
+    }
     return this.ready.then(function(db){
       return new Promise(function(resolve,reject){
         var tx=db.transaction('photos','readwrite');
         tx.objectStore('photos').put({id:id,blob:blob});
         tx.oncomplete=function(){resolve()};
         tx.onerror=function(){reject(tx.error)};
+        tx.onabort=function(){reject(tx.error||new Error('tx aborted'))};
       });
     });
   },
@@ -881,7 +889,10 @@ function wrapSaveEl(el){
     try{r=orig.apply(this,arguments)}
     catch(e){reset();throw e}
     if(r&&typeof r.then==='function'){r.then(reset,reset)}
-    else{setTimeout(reset,500)}
+    else{
+      // sync handler: add minimal visual lockout (150ms) to catch double-tap race
+      setTimeout(reset,150);
+    }
   };
 }
 function wrapSave(id){wrapSaveEl(document.getElementById(id))}
@@ -970,7 +981,7 @@ function showShareModal(title,text,key){
       document.body.appendChild(a);
       a.click();
       a.remove();
-      setTimeout(function(){URL.revokeObjectURL(url)},1000);
+      setTimeout(function(){try{URL.revokeObjectURL(url)}catch(_){}},5000);
       toast('图片已保存到手机');
       mask.remove();
     },'image/png');
@@ -1056,6 +1067,30 @@ function addWatermark(imgURL,data,cb){
 
 /* ========================= Router ========================= */
 var routes={};
+// Dirty-form guard (for assessment/special-exam/scale/plan pages).
+// Call `markDirty(id)` on any form input change; `clearDirty()` on save.
+// Router/hashchange will prompt before navigation if dirty.
+var _dirtyId=null,_dirtyMsg='当前页面有未保存的内容，离开将丢失，确定？';
+function markDirty(id){_dirtyId=id||'any'}
+function clearDirty(){_dirtyId=null}
+function isDirty(){return _dirtyId!==null}
+function confirmIfDirty(msg){if(!isDirty())return true;return confirm(msg||_dirtyMsg)}
+/* Attach markDirty listeners to all form inputs (input/select/textarea/radio/checkbox) within root (selector or element). Caller still needs clearDirty on save. */
+function bindDirtyGuard(root){
+  var el=root;if(typeof root==='string')el=document.getElementById(root);
+  if(!el)return;
+  var sel='input,select,textarea,[data-rom-active],[data-rom-passive],[data-rom-joint],[data-muscle-group],[data-muscle-note],[data-muscle-grade],[data-adl],[data-plan-goal],[data-plan-freq],[data-plan-freqc],[data-plan-notes]';
+  el.querySelectorAll(sel).forEach(function(n){
+    n.addEventListener('change',function(){markDirty('form')},true);
+    n.addEventListener('input',function(){markDirty('form')},true);
+    n.addEventListener('click',function(){if(n.tagName==='LABEL'||n.type==='radio'||n.type==='checkbox')markDirty('form')},true);
+  });
+  // pill buttons (adl / mpq):
+  el.querySelectorAll('.pill,[data-mpq-e],[data-mpq-sa],[data-mpq-af]').forEach(function(n){
+    n.addEventListener('click',function(){markDirty('form')});
+  });
+}
+
 function route(path){
   // path like /camera or /record/:id or /camera?type=...
   var qIdx=path.indexOf('?');
@@ -1072,6 +1107,7 @@ function route(path){
   var fn=routes[key]||routes['/home'];
   renderTabbar(key);
   var param=parts[1]?decodeURIComponent(parts[1]):null;
+  clearDirty();
   fn(param,query);
   // add back button to sub-pages
   var hdr=document.querySelector('.page-header');
@@ -1088,12 +1124,21 @@ function route(path){
   var goLinks=document.querySelectorAll('#app [data-go]');
   for(var m=0;m<goLinks.length;m++){
     (function(el){
-      el.addEventListener('click',function(e){e.stopPropagation();go(el.getAttribute('data-go'))});
+      el.addEventListener('click',function(e){
+        if(isDirty()&&!confirm(_dirtyMsg)){e.preventDefault();e.stopPropagation();return}
+        e.stopPropagation();go(el.getAttribute('data-go'));
+      });
     })(goLinks[m]);
   }
   window.scrollTo(0,0);
 }
-function go(path){location.hash='#'+path}
+function go(path){
+  if(location.hash!=='#'+path&&isDirty()&&!confirm(_dirtyMsg))return;
+  location.hash='#'+path;
+}
+window.addEventListener('beforeunload',function(e){
+  if(isDirty()){e.preventDefault();e.returnValue=_dirtyMsg;return _dirtyMsg}
+});
 window.addEventListener('hashchange',function(){
   var h=location.hash.slice(1)||'/home';
   route(h);
@@ -1153,7 +1198,7 @@ routes['/home']=function(){
   var rpHtml='';
   if(recentPatients.length===0){rpHtml='<div class="empty"><div class="ei">👥</div>暂无患者，去添加</div>'}
   else{recentPatients.forEach(function(p){
-    rpHtml+='<div class="patient-card" data-pid="'+p.id+'"><div class="avatar">'+escapeHtml((p.name||'?').slice(0,1))+'</div><div class="patient-info"><div class="pn">'+escapeHtml(p.name)+'</div><div class="pm"><span>'+(p.gender||'')+'</span><span>'+(p.age||'')+'岁</span><span>'+escapeHtml(p.diagnosis||'')+'</span></div></div><div class="row-actions"><button class="btn-mini" data-cam="'+p.id+'">拍照</button></div></div>';
+    rpHtml+='<div class="patient-card" data-pid="'+p.id+'"><div class="avatar">'+escapeHtml((p.name||'?').slice(0,1))+'</div><div class="patient-info"><div class="pn">'+escapeHtml(p.name)+'</div><div class="pm"><span>'+escapeHtml(p.gender||'')+'</span><span>'+escapeHtml(p.age||'')+'岁</span><span>'+escapeHtml(p.diagnosis||'')+'</span></div></div><div class="row-actions"><button class="btn-mini" data-cam="'+p.id+'">拍照</button></div></div>';
   })}
 
   var rrHtml='';
@@ -1240,7 +1285,7 @@ routes['/patients']=function(param,query){
     patients.forEach(function(p){
       var canDel=canDeletePatient(p);
       var canEdit=canEditPatient(p);
-      list+='<div class="patient-card" data-pid="'+p.id+'"><div class="avatar">'+escapeHtml((p.name||'?').slice(0,1))+'</div><div class="patient-info"><div class="pn">'+escapeHtml(p.name)+'</div><div class="pm"><span>'+(p.gender||'')+'</span><span>'+(p.age||'')+'岁</span><span>'+(p.diagnosis||'')+'</span>'+(p.patientId?'<span style="font-family:monospace;font-size:11px;color:#aaa">'+escapeHtml(p.patientId)+'</span>':'')+'</div></div><div class="row-actions">'+
+      list+='<div class="patient-card" data-pid="'+p.id+'"><div class="avatar">'+escapeHtml((p.name||'?').slice(0,1))+'</div><div class="patient-info"><div class="pn">'+escapeHtml(p.name)+'</div><div class="pm"><span>'+escapeHtml(p.gender||'')+'</span><span>'+escapeHtml(p.age||'')+'岁</span><span>'+escapeHtml(p.diagnosis||'')+'</span>'+(p.patientId?'<span style="font-family:monospace;font-size:11px;color:#aaa">'+escapeHtml(p.patientId)+'</span>':'')+'</div></div><div class="row-actions">'+
         (canEdit?'<button class="btn-mini" data-edit="'+p.id+'">编辑</button>':'')+
         (canDel?'<button class="btn-mini danger" data-del="'+p.id+'">删除</button>':'')+
         '</div></div>';
@@ -1367,8 +1412,8 @@ routes['/patient/:id']=function(id){
     '<div class="patient-detail-hd">'+
       '<div class="pname">'+escapeHtml(p.name)+'</div>'+
       '<div class="pmeta">'+
-        '<span>'+(p.gender||'-')+'</span>'+
-        '<span>'+(p.age||'-')+'岁</span>'+
+        '<span>'+escapeHtml(p.gender||'-')+'</span>'+
+        '<span>'+escapeHtml(p.age||'-')+'岁</span>'+
         '<span>'+escapeHtml(p.diagnosis||'未诊断')+'</span>'+
       '</div>'+
       (p.patientId?'<div class="pid">ID: '+escapeHtml(p.patientId)+'</div>':'')+
@@ -1726,10 +1771,15 @@ routes['/record/:id']=function(id){
   };
   document.getElementById('del_rec').onclick=function(){
     confirmDialog('确定删除该记录？照片也将删除',function(){
-      var rs=getRecords().filter(function(x){return x.id!==id});
-      setRecords(rs);
-      if(r.photoId){DB.delPhoto(r.photoId)}
-      toast('已删除');go('/records');
+      var bak=getRecords();
+      var rs=bak.filter(function(x){return x.id!==id});
+      if(!setRecords(rs)){toast('删除失败：存储空间不足');return}
+      try{
+        if(r.photoId){DB.delPhoto(r.photoId).catch(function(){})}
+        toast('已删除');go('/records');
+      }catch(e){
+        setRecords(bak);toast('删除失败，已回滚：'+e.message);
+      }
     });
   };
 };
@@ -1762,7 +1812,7 @@ function saveCertImage(r,hash){
     var a=document.createElement('a');
     a.href=url;a.download='cert_'+r.recordNo+'.png';
     document.body.appendChild(a);a.click();a.remove();
-    setTimeout(function(){URL.revokeObjectURL(url)},1000);
+    setTimeout(function(){try{URL.revokeObjectURL(url)}catch(_){}},5000);
     toast('证明图片已下载');
   });
 }
@@ -1852,7 +1902,7 @@ routes['/settings']=function(){
     archiveHtml='<div id="archive_list">';
     allPatients.forEach(function(p){
       var canDel=canDeletePatient(p);
-      archiveHtml+='<div class="patient-card" data-apid="'+p.id+'"><div class="patient-info"><div class="pn">'+escapeHtml(p.name)+' <span class="tag">'+escapeHtml(p.patientId||p.id.slice(0,6))+'</span></div><div class="pm"><span>'+(p.gender||'')+'</span><span>'+(p.age||'')+'岁</span><span>'+escapeHtml(p.diagnosis||'')+'</span></div></div><div class="row-actions">'+
+      archiveHtml+='<div class="patient-card" data-apid="'+p.id+'"><div class="patient-info"><div class="pn">'+escapeHtml(p.name)+' <span class="tag">'+escapeHtml(p.patientId||p.id.slice(0,6))+'</span></div><div class="pm"><span>'+escapeHtml(p.gender||'')+'</span><span>'+escapeHtml(p.age||'')+'岁</span><span>'+escapeHtml(p.diagnosis||'')+'</span></div></div><div class="row-actions">'+
         '<button class="btn-mini" data-exp1="'+p.id+'">导出</button>'+
         (canDel?'<button class="btn-mini danger" data-delap="'+p.id+'">删除</button>':'')+
         '</div></div>';
@@ -2054,7 +2104,7 @@ routes['/settings']=function(){
         confirmDialog('再次确认清空全部数据？',function(){
           LS.del('therapist_info');LS.del('therapist_profiles');LS.del('active_profile_id');LS.del('patients');LS.del('records');
           LS.del('assessments');LS.del('specialExams');LS.del('scales');LS.del('plans');LS.del('customExams');LS.del('customScales');LS.del('userRole');
-          DB.clear().then(function(){toast('已清空所有数据');go('/home')});
+          DB.clear().then(function(){toast('已清空所有数据');go('/home')}).catch(function(e){toast('清空失败：'+(e&&e.message||''))});
         });
       });
     };
@@ -2127,7 +2177,7 @@ function finishExport(exp){
   var a=document.createElement('a');
   a.href=url;a.download='therapy_backup_'+todayStr()+'.json';
   document.body.appendChild(a);a.click();a.remove();
-  setTimeout(function(){URL.revokeObjectURL(url)},1000);
+  setTimeout(function(){try{URL.revokeObjectURL(url)}catch(_){}},5000);
   toast('备份已下载');
 }
 
@@ -2215,7 +2265,7 @@ function exportExcel(){
     html+='<td>'+(pal.painLevel!=null?pal.painLevel:'-')+'</td>';
     html+='<td>'+escapeHtml(romStr||'-')+'</td>';
     html+='<td>'+escapeHtml(muscleStr||'-')+'</td>';
-    html+='<td>'+(skinT.left||'-')+'/'+(skinT.right||'-')+'</td>';
+    html+='<td>'+escapeHtml((skinT.left||'-'))+'/'+escapeHtml((skinT.right||'-'))+'</td>';
     html+='</tr>';
   });
   html+='</table>';
@@ -2332,7 +2382,7 @@ function exportExcel(){
   var a=document.createElement('a');
   a.href=url;a.download='康复评估全数据_'+todayStr()+'.xls';
   document.body.appendChild(a);a.click();a.remove();
-  setTimeout(function(){URL.revokeObjectURL(url)},1000);
+  setTimeout(function(){try{URL.revokeObjectURL(url)}catch(_){}},5000);
   toast('Excel全数据已下载（'+patients.length+'患者/'+records.length+'记录/'+Object.keys(assessments).length+'评估）');
 }
 
@@ -2377,36 +2427,40 @@ function finishFullBackup(exp){
   var a=document.createElement('a');
   a.href=url;a.download='rehab_backup_'+todayStr()+'.json';
   document.body.appendChild(a);a.click();a.remove();
-  setTimeout(function(){URL.revokeObjectURL(url)},1000);
+  setTimeout(function(){try{URL.revokeObjectURL(url)}catch(_){}},5000);
   toast('完整备份已下载（含'+exp.patients.length+'患者/'+exp.records.length+'记录/'+exp.photos.length+'照片）');
 }
 
 function importFullBackup(data){
+  // Anti prototype pollution: reject dangerous keys
+  var BAD_KEYS={__proto__:1,constructor:1,prototype:1,hasOwnProperty:1,toString:1,valueOf:1};
+  function isSafeKey(k){return !BAD_KEYS[k]&&typeof k==='string'&&k.indexOf('__')!==0}
   // merge: patients by id, records by id, others overwrite by key
   if(data.patients){
     var existing=getPatients();
     var map={};
-    existing.forEach(function(p){map[p.id]=p});
-    data.patients.forEach(function(p){map[p.id]=p});
-    setPatients(Object.keys(map).map(function(k){return map[k]}));
+    existing.forEach(function(p){if(isSafeKey(p.id))map[p.id]=p});
+    data.patients.forEach(function(p){if(p&&isSafeKey(p.id))map[p.id]=p});
+    setPatients(Object.keys(map).filter(isSafeKey).map(function(k){return map[k]}));
   }
   if(data.records){
     var er=getRecords();var rmap={};
-    er.forEach(function(r){rmap[r.id]=r});
-    data.records.forEach(function(r){rmap[r.id]=r});
-    setRecords(Object.keys(rmap).map(function(k){return rmap[k]}));
+    er.forEach(function(r){if(isSafeKey(r.id))rmap[r.id]=r});
+    data.records.forEach(function(r){if(r&&isSafeKey(r.id))rmap[r.id]=r});
+    setRecords(Object.keys(rmap).filter(isSafeKey).map(function(k){return rmap[k]}));
   }
-  if(data.assessments){var a=getAssessments();Object.keys(data.assessments).forEach(function(k){a[k]=data.assessments[k]});setAssessments(a)}
-  if(data.specialExams){var se=getSpecialExams();Object.keys(data.specialExams).forEach(function(k){se[k]=data.specialExams[k]});setSpecialExams(se)}
-  if(data.scales){var sc=getScales();Object.keys(data.scales).forEach(function(k){sc[k]=data.scales[k]});setScales(sc)}
-  if(data.plans){var pl=getPlans();Object.keys(data.plans).forEach(function(k){pl[k]=data.plans[k]});setPlans(pl)}
-  if(data.profiles){var pr=getProfiles();var pmap={};pr.forEach(function(p){pmap[p.id]=p});data.profiles.forEach(function(p){pmap[p.id]=p});setProfiles(Object.keys(pmap).map(function(k){return pmap[k]}))}
+  if(data.assessments){var a=getAssessments();Object.keys(data.assessments).filter(isSafeKey).forEach(function(k){a[k]=data.assessments[k]});setAssessments(a)}
+  if(data.specialExams){var se=getSpecialExams();Object.keys(data.specialExams).filter(isSafeKey).forEach(function(k){se[k]=data.specialExams[k]});setSpecialExams(se)}
+  if(data.scales){var sc=getScales();Object.keys(data.scales).filter(isSafeKey).forEach(function(k){sc[k]=data.scales[k]});setScales(sc)}
+  if(data.plans){var pl=getPlans();Object.keys(data.plans).filter(isSafeKey).forEach(function(k){pl[k]=data.plans[k]});setPlans(pl)}
+  if(data.profiles){var pr=getProfiles();var pmap={};pr.forEach(function(p){if(isSafeKey(p.id))pmap[p.id]=p});data.profiles.forEach(function(p){if(p&&isSafeKey(p.id))pmap[p.id]=p});setProfiles(Object.keys(pmap).filter(isSafeKey).map(function(k){return pmap[k]}))}
   if(data.customExams){var ce=getCustomExams();data.customExams.forEach(function(e){var found=ce.some(function(x){return x.name===e.name&&x.category===e.category});if(!found)ce.push(e)});setCustomExams(ce)}
   if(data.customScales){var cs=getCustomScales();data.customScales.forEach(function(s){var found=cs.some(function(x){return x.name===s.name});if(!found)cs.push(s)});setCustomScales(cs)}
   // import photos (async)
   if(data.photos&&data.photos.length){
     var cnt=0;var tot=data.photos.length;
     data.photos.forEach(function(ph){
+      if(!ph||!isSafeKey(ph.id)){cnt++;if(cnt===tot){toast('已导入照片（跳过非法ID）')};return}
       var blob=dataURLToBlob(ph.dataURL);
       DB.putPhoto(ph.id,blob).then(function(){cnt++;if(cnt===tot){toast('已导入'+tot+'张照片')}}).catch(function(){cnt++;if(cnt===tot){toast('已导入照片（部分失败）')}});
     });
@@ -2450,7 +2504,7 @@ function finishSingleExport(exp){
   var a=document.createElement('a');
   a.href=url;a.download='patient_'+(exp.patient.patientId||exp.patient.id)+'_'+todayStr()+'.json';
   document.body.appendChild(a);a.click();a.remove();
-  setTimeout(function(){URL.revokeObjectURL(url)},1000);
+  setTimeout(function(){try{URL.revokeObjectURL(url)}catch(_){}},5000);
   toast('已导出患者档案：'+exp.patient.name);
 }
 
@@ -2462,7 +2516,7 @@ function exportAllPatients(){
   var a=document.createElement('a');
   a.href=url;a.download='all_patients_'+todayStr()+'.json';
   document.body.appendChild(a);a.click();a.remove();
-  setTimeout(function(){URL.revokeObjectURL(url)},1000);
+  setTimeout(function(){try{URL.revokeObjectURL(url)}catch(_){}},5000);
   toast('已导出 '+patients.length+' 位患者档案');
 }
 
@@ -2475,7 +2529,7 @@ function renderPatientPicker(title,sub,onPick){
   else{
     list='<div class="patient-select-list">';
     patients.forEach(function(p){
-      list+='<div class="ps-item" data-pid="'+p.id+'"><div style="font-weight:600">'+escapeHtml(p.name)+'</div><div style="font-size:12px;color:#888;margin-top:2px"><span>'+(p.gender||'')+'</span> <span>'+(p.age||'')+'岁</span> <span>'+escapeHtml(p.diagnosis||'')+'</span>'+(p.patientId?' <span style="font-family:monospace">'+escapeHtml(p.patientId)+'</span>':'')+'</div></div>';
+      list+='<div class="ps-item" data-pid="'+p.id+'"><div style="font-weight:600">'+escapeHtml(p.name)+'</div><div style="font-size:12px;color:#888;margin-top:2px"><span>'+escapeHtml(p.gender||'')+'</span> <span>'+escapeHtml(p.age||'')+'岁</span> <span>'+escapeHtml(p.diagnosis||'')+'</span>'+(p.patientId?' <span style="font-family:monospace">'+escapeHtml(p.patientId)+'</span>':'')+'</div></div>';
     });
     list+='</div>';
   }
@@ -2707,10 +2761,12 @@ routes['/assessment/:id']=function(id){
       skinTemp:{left:document.getElementById('sk_left').value.trim(),right:document.getElementById('sk_right').value.trim()},
       adl:{items:adlData}
     };
+    clearDirty();
     setAssessment(id,data);
     toast('评估已保存');
   };
   wrapSave('as_save');
+  bindDirtyGuard('app');
 };
 
 /* ==================== Task 3: Special Exam Module ==================== */
@@ -2801,10 +2857,12 @@ routes['/special-exam/:id']=function(id){
         list.push({examName:e.name,category:e.category,result:res,note:note,video:e.video,date:Date.now()});
       }
     });
+    clearDirty();
     setSpecialExamList(id,list);
     toast('已保存 '+list.length+' 项检查结果');
   };
   wrapSave('se_save');
+  bindDirtyGuard('app');
 };
 
 /* ==================== Task 4: Scales Module ==================== */
