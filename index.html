@@ -503,8 +503,9 @@ function getStoredSchemaVersion(){var v=LS.get(SCHEMA_KEY);return (typeof v==='n
 // 迁移：每次升级写一个明确的 from→to 步骤，幂等、可重入
 function migrateSchema(from,to){
   var log=[];
+  var failed=false;
   function step(cur,fn){
-    if(from<=cur&&to>cur){try{fn();log.push('v'+(cur+1)+':ok')}catch(e){log.push('v'+(cur+1)+':fail '+e.message)}}
+    if(from<=cur&&to>cur){try{fn();log.push('v'+(cur+1)+':ok')}catch(e){log.push('v'+(cur+1)+':fail '+e.message);failed=true}}
   }
   // v0→1: 旧版无 schema，确保 auditLog/pinHash 容器存在
   step(0,function(){
@@ -526,6 +527,7 @@ function migrateSchema(from,to){
     ps.forEach(function(p){if(!p.createdBy)p.createdBy='legacy'});
     setPatients(ps);
   });
+  if(failed){console.error('[schema] migration had failures, not updating version');return log}
   LS.set(SCHEMA_KEY,to);
   console.log('[schema] migrated',from,'→',to,'|',log.join(', '));
   return log;
@@ -763,28 +765,30 @@ function deletePatientData(pid){
   var bak_scales=getScales();
   var bak_plans=getPlans();
   function rollback(){
-    LS.set('patients',bak_patients);
-    LS.set('records',bak_records);
-    LS.set('assessments',bak_assessments);
-    LS.set('specialExams',bak_specialExams);
-    LS.set('scales',bak_scales);
-    LS.set('plans',bak_plans);
+    var ok=true;
+    ok=LS.set('patients',bak_patients)&&ok;
+    ok=LS.set('records',bak_records)&&ok;
+    ok=LS.set('assessments',bak_assessments)&&ok;
+    ok=LS.set('specialExams',bak_specialExams)&&ok;
+    ok=LS.set('scales',bak_scales)&&ok;
+    ok=LS.set('plans',bak_plans)&&ok;
+    if(!ok){toast('⚠️ 删除失败且回滚不完整，请立即导出备份')}
+    return ok;
   }
   var arr=bak_patients.filter(function(p){return p.id!==pid});
   if(!LS.set('patients',arr)){rollback();return false}
   var toDel=bak_records.filter(function(r){return r.patientId===pid});
   var rs=bak_records.filter(function(r){return r.patientId!==pid});
   if(!LS.set('records',rs)){rollback();return false}
-  toDel.forEach(function(r){if(r.photoId){DB.delPhoto(r.photoId).catch(function(){})}});
-  var a=bak_assessments;delete a[pid];
+  var a=Object.assign({},bak_assessments);delete a[pid];
   if(!LS.set('assessments',a)){rollback();return false}
-  var se=bak_specialExams;delete se[pid];
+  var se=Object.assign({},bak_specialExams);delete se[pid];
   if(!LS.set('specialExams',se)){rollback();return false}
-  var sc=bak_scales;delete sc[pid];
+  var sc=Object.assign({},bak_scales);delete sc[pid];
   if(!LS.set('scales',sc)){rollback();return false}
-  var pl=bak_plans;delete pl[pid];
+  var pl=Object.assign({},bak_plans);delete pl[pid];
   if(!LS.set('plans',pl)){rollback();return false}
-  // 审计：删除成功后记录
+  toDel.forEach(function(r){if(r.photoId){DB.delPhoto(r.photoId).catch(function(e){console.warn('[DB] 照片清理失败',r.photoId,e)})}});
   var deleted=bak_patients.filter(function(p){return p.id===pid})[0];
   audit('patient.delete',{id:pid,name:deleted?deleted.name:'',records:toDel.length});
   return true;
@@ -1161,13 +1165,15 @@ function wrapSaveEl(el){
   el.onclick=function(){
     if(el.dataset.busy)return;
     el.dataset.busy='1';el.disabled=true;
-    var reset=function(){el.dataset.busy='';el.disabled=false};
+    var done=false;
+    var reset=function(){if(!done){done=true;el.dataset.busy='';el.disabled=false}};
     var r;
     try{r=orig.apply(this,arguments)}
     catch(e){reset();throw e}
-    if(r&&typeof r.then==='function'){r.then(reset,reset)}
-    else{
-      // sync handler: add minimal visual lockout (150ms) to catch double-tap race
+    if(r&&typeof r.then==='function'){
+      r.then(reset,reset);
+      setTimeout(reset,10000);
+    }else{
       setTimeout(reset,150);
     }
   };
@@ -1829,7 +1835,7 @@ routes['/patient/:id']=function(id){
         if(blob){
           var url=URL.createObjectURL(blob);
           var img=document.getElementById('thumb_'+rid);
-          if(img){img.onload=function(){URL.revokeObjectURL(url)};img.src=url}
+          if(img){var free=function(){URL.revokeObjectURL(url)};img.onload=free;img.onerror=free;img.src=url}
           else{URL.revokeObjectURL(url)}
         }
       }).catch(function(){});
@@ -2098,7 +2104,7 @@ routes['/records']=function(){
         if(blob){
           var url=URL.createObjectURL(blob);
           var img=document.getElementById('thumb_'+rid);
-          if(img){img.onload=function(){URL.revokeObjectURL(url)};img.src=url}
+          if(img){var free=function(){URL.revokeObjectURL(url)};img.onload=free;img.onerror=free;img.src=url}
           else{URL.revokeObjectURL(url)}
         }
       }).catch(function(){});
@@ -2129,7 +2135,7 @@ routes['/record/:id']=function(id){
       if(blob){
         var url=URL.createObjectURL(blob);
         var img=document.getElementById('detail_img');
-        if(img){img.onload=function(){URL.revokeObjectURL(url)};img.src=url}
+        if(img){var free=function(){URL.revokeObjectURL(url)};img.onload=free;img.onerror=free;img.src=url}
         else{URL.revokeObjectURL(url)}
       }
     }).catch(function(){});
@@ -3693,7 +3699,7 @@ routes['/scales/:id']=function(id){
     var saveBtn=document.querySelector('[data-cs-save="'+cs.id+'"]');
     if(saveBtn)saveBtn.onclick=function(){
       var total=0;Object.keys(csData).forEach(function(k){total+=csData[k]});
-      if(!addScaleRecord(id,{scaleType:'custom_'+cs.id,score:total,conclusion:cs.name+' 总分 '+total+'/'+cs.maxTotal,data:csData,date:Date.now()})){toast('⚠️ 保存失败：存储空间不足');return}
+      if(!addScaleRecord(id,{scaleType:'custom_'+cs.id,score:total,conclusion:escapeHtml(cs.name)+' 总分 '+total+'/'+cs.maxTotal,data:csData,date:Date.now()})){toast('⚠️ 保存失败：存储空间不足');return}
       toast('已保存');route('/scales/'+id);
     };
     if(saveBtn)wrapSaveEl(saveBtn);
