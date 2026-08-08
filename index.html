@@ -88,6 +88,18 @@ a{text-decoration:none;color:inherit}
 .btn-danger{background:#e53e3e}
 .btn-block{display:block;width:100%;padding:11px;text-align:center;border-radius:6px;font-size:14px;font-weight:600}
 
+/* 示例模板卡片 */
+.tpl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:8px}
+.tpl-item{border:1px solid #e2e8f0;border-radius:8px;padding:12px;cursor:pointer;transition:all .2s;position:relative;background:#fff}
+.tpl-item:hover{background:#ebf8ff;border-color:var(--primary);box-shadow:0 2px 8px rgba(49,130,206,.15);transform:translateY(-1px)}
+.tpl-item .tpl-tag{position:absolute;top:8px;right:8px;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600}
+.tpl-item .tpl-tag.tag-msk{background:#bee3f8;color:#2c5282}
+.tpl-item .tpl-tag.tag-neuro{background:#fbd38d;color:#c05621}
+.tpl-item .tpl-name{font-size:14px;font-weight:600;margin-right:48px}
+.tpl-item .tpl-desc{font-size:11px;color:#718096;margin-top:4px;line-height:1.4}
+.tpl-item .tpl-act{font-size:11px;color:var(--primary);margin-top:8px;font-weight:500}
+.tpl-item:active{transform:translateY(0);box-shadow:none}
+
 /* tab bar */
 #tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#fff;display:flex;height:calc(60px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -1px 6px rgba(0,0,0,.08);z-index:100}
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:#888;position:relative;cursor:pointer}
