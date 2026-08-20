@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0e9488">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="个人康复工作台">
+<meta name="description" content="个人康复工作台 · 治疗师一站式日程 / 患者 / 评估 / 量表 / 方案">
+<title>个人康复工作台</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="shell">
+
+  <!-- 桌面侧栏 -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">康</div>
+      <div>
+        <div class="bn">个人康复工作台</div>
+        <div class="bs">Rehab Workbench</div>
+      </div>
+    </div>
+    <nav class="nav" id="navDesk"></nav>
+    <div class="side-foot" id="sideFootDesk"></div>
+  </aside>
+
+  <!-- 移动抽屉 -->
+  <div class="m-drawer" id="mDrawer" style="display:none">
+    <div class="m-backdrop" data-close-drawer></div>
+    <div class="m-panel">
+      <div class="brand">
+        <div class="logo">康</div>
+        <div>
+          <div class="bn">个人康复工作台</div>
+          <div class="bs">Rehab Workbench</div>
+        </div>
+      </div>
+      <nav class="nav" id="navMobile"></nav>
+      <div class="side-foot" id="sideFootMobile"></div>
+    </div>
+  </div>
+
+  <!-- 主内容 -->
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn hamburger" id="hamburger" aria-label="菜单"></button>
+      <div class="page-title" id="pageTitle">今日概览</div>
+      <div class="search">
+        <span class="ic" id="searchIc"></span>
+        <input id="globalSearch" type="text" placeholder="搜索患者、量表、方案…">
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" id="btnNotify" aria-label="通知"><span class="dot"></span></button>
+        <button class="icon-btn" id="btnPlus" aria-label="新增"></button>
+      </div>
+    </header>
+    <main class="content" id="view"></main>
+  </div>
+
+</div>
+
+<!-- 移动底栏 -->
+<nav class="tabbar" id="tabbar"></nav>
+<button class="fab" id="fab" aria-label="新增"></button>
+
+<script src="mock.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
