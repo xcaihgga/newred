@@ -39,6 +39,14 @@ function initials(name) { return String(name).replace(/[·示例]/g, '').slice(0
 
 var EXAM_RESULT = { positive: { t: '阳性', c: 'pos' }, negative: { t: '阴性', c: 'neg' }, suspect: { t: '可疑', c: 'neutral' } };
 var LEVEL = { high: { t: '高', c: 'pri-h' }, mid: { t: '中', c: 'pri-m' }, low: { t: '低', c: 'pri-l' } };
+var RECORD_TYPES = {
+  assessment: { label: '评估', color: '#0e9488', icon: 'clipboard' },
+  exam: { label: '特殊检查', color: '#3b82c4', icon: 'activity' },
+  scale: { label: '量表', color: '#8b5fbf', icon: 'activity' },
+  plan: { label: '方案', color: '#d9804a', icon: 'filetext' },
+  treatment: { label: '治疗', color: '#0e9488', icon: 'clock' },
+  photo: { label: '照片', color: '#4f9e63', icon: 'grid' }
+};
 
 function toast(msg) {
   var t = document.createElement('div');
@@ -52,11 +60,12 @@ function toast(msg) {
 var NAV = [
   { route: 'dashboard', label: '今日概览', ic: 'home' },
   { route: 'schedule', label: '日程', ic: 'calendar' },
+  { route: 'records', label: '记录', ic: 'filetext' },
   { route: 'patients', label: '患者', ic: 'users' },
   { route: 'todo', label: '待办', ic: 'listchecks' },
   { route: 'settings', label: '设置', ic: 'settings' }
 ];
-var ROUTE_TITLES = { dashboard: '今日概览', schedule: '日程', patients: '患者管理', patient: '患者详情', todo: '待办与打卡', settings: '设置', assess: '评估量表' };
+var ROUTE_TITLES = { dashboard: '今日概览', schedule: '日程', records: '记录中心', patients: '患者管理', patient: '患者详情', todo: '待办与打卡', settings: '设置', assess: '评估量表' };
 
 /* ---------- Shell 初始化 ---------- */
 function renderShell() {
@@ -83,8 +92,8 @@ function renderShell() {
   document.getElementById('sideFootDesk').innerHTML = tc;
   document.getElementById('sideFootMobile').innerHTML = tc;
 
-  /* 底栏（移动） */
-  var tabItems = NAV.map(function (n) {
+  /* 底栏（移动，最多 5 项：不含设置） */
+  var tabItems = NAV.slice(0, 5).map(function (n) {
     return '<div class="tabx" data-route="' + n.route + '" onclick="go(\'' + n.route + '\')">' + icon(n.ic) + '<span>' + n.label.replace('今日概览', '首页') + '</span></div>';
   }).join('');
   document.getElementById('tabbar').innerHTML = tabItems;
@@ -112,6 +121,7 @@ function openAddMenu() {
     '<div class="g2" style="display:grid">' +
     addMenuBtn('patients', 'users', '新增患者', '建立患者档案') +
     addMenuBtn('schedule', 'calendar', '新建预约', '安排治疗/评估时间') +
+    addMenuBtn('records', 'filetext', '新增记录', '治疗 / 评估 / 量表 / 照片') +
     addMenuBtn('assess', 'clipboard', '快速评估', '量表 + 特殊检查') +
     addMenuBtn('todo', 'listchecks', '添加待办', '记录今日待办') +
     '</div></div>'
@@ -138,6 +148,7 @@ function route() {
   var html;
   if (section === 'dashboard') html = renderDashboard();
   else if (section === 'schedule') html = renderSchedule();
+  else if (section === 'records') html = renderRecords();
   else if (section === 'patients') html = renderPatients();
   else if (section === 'patient') html = renderPatientDetail(p[1], p[2] || 'assessment');
   else if (section === 'todo') html = renderTodo();
@@ -185,13 +196,7 @@ function renderDashboard() {
       '<div class="tb-m"><span>' + esc(a.note) + '</span><span class="tagchip">' + esc(p.diagnosis) + '</span></div></div></div>';
   }).join('');
 
-  var recent = DB.patients.slice(0, 3).map(function (p) {
-    return '<div class="pat-card" onclick="goPatient(\'' + p.id + '\')">' + avatarHtml(p) +
-      '<div class="pi"><div class="pn">' + esc(p.name) + ' ' + tag(p.tag, p.tagCls) + '</div>' +
-      '<div class="pm"><span>' + esc(p.diagnosis) + '</span></div>' +
-      '<div class="pm"><span>' + p.gender + ' · ' + p.age + '岁</span><span>' + esc(p.lastVisit) + '</span></div></div>' +
-      '<span class="chev">' + icon('chevron') + '</span></div>';
-  }).join('');
+  var recentRecs = DB.records.slice(0, 4).map(recordRow).join('');
 
   var todos = DB.todos.slice(0, 3).map(todoRow).join('');
 
@@ -207,7 +212,7 @@ function renderDashboard() {
 
     '<div class="grid g4" style="margin-top:16px">' +
       statCard('calendar', '#0e9488', s.todayAppt, '今日预约', '较昨日 +1', true) +
-      statCard('checkcircle', '#2fa36e', s.todayDone, '已完成', '完成率 67%') +
+      statCard('filetext', '#8b5fbf', s.todayRecords, '今日记录', '评估+治疗+量表') +
       statCard('users', '#3b82c4', s.totalPatients, '在管患者', '本月 +12') +
       statCard('alert', '#d9804a', s.pending, '待评估', '需今日处理') +
     '</div>' +
@@ -219,16 +224,16 @@ function renderDashboard() {
       '<div class="grid" style="gap:16px">' +
         '<div class="card"><div class="card-hd"><div class="tt">待办</div><div class="lnk" onclick="go(\'todo\')">全部</div></div>' +
           '<div class="card-bd">' + (todos || emptyBlock('待办已清空')) + '</div></div>' +
-        '<div class="card"><div class="card-hd"><div class="tt">最近患者</div><div class="lnk" onclick="go(\'patients\')">全部</div></div>' +
-          '<div class="card-bd" style="padding:12px 15px;display:flex;flex-direction:column;gap:10px">' + recent + '</div></div>' +
+        '<div class="card"><div class="card-hd"><div class="tt">最近记录</div><div class="lnk" onclick="go(\'records\')">全部</div></div>' +
+          '<div class="card-bd" style="padding:12px 15px;display:flex;flex-direction:column;gap:8px">' + (recentRecs || emptyBlock('暂无记录')) + '</div></div>' +
       '</div>' +
     '</div>' +
 
     '<div class="card" style="margin-top:16px"><div class="card-hd"><div class="tt">快捷入口</div></div>' +
       '<div class="card-bd"><div class="chips">' +
-      quick('patients', 'users', '新增患者') + quick('assess', 'clipboard', '快速评估') +
-      quick('assess', 'activity', '量表库') + quick('schedule', 'calendar', '排班') +
-      quick('settings', 'settings', '收费查询') +
+      quick('records', 'filetext', '记录中心') + quick('patients', 'users', '新增患者') +
+      quick('assess', 'clipboard', '快速评估') + quick('assess', 'activity', '量表库') +
+      quick('schedule', 'calendar', '排班') + quick('settings', 'settings', '收费查询') +
       '</div></div></div>'
   );
 }
@@ -364,7 +369,7 @@ function renderPatientDetail(id, tab) {
   if (tab === 'assessment') body = renderAssessment(p);
   else if (tab === 'scales') body = renderScales(p);
   else if (tab === 'plan') body = renderPlan(p);
-  else if (tab === 'record') body = renderRecords(p);
+  else if (tab === 'record') body = renderPatientRecords(p);
 
   return (
     '<div class="detail-hd" style="margin-bottom:16px">' +
@@ -446,18 +451,67 @@ function renderPlan(p) {
   return card('<div class="tt">康复方案（分三期）</div>', html);
 }
 
-function renderRecords(p) {
-  var recs = [
-    { t: '治疗记录', d: '昨天 · 牵引 20min + 中频电疗', ic: 'filetext' },
-    { t: '评估记录', d: '3天前 · 初评完成（VAS 7/10）', ic: 'clipboard' },
-    { t: '照片记录', d: '1周前 · 体态照片 2 张', ic: 'grid' }
-  ];
-  var html = recs.map(function (r) {
-    return '<div class="scale-item"><span class="s-ic" style="background:var(--accent-muted);color:var(--accent)">' + icon(r.ic) + '</span>' +
-      '<div class="si-main"><div class="si-name">' + r.t + '</div><div class="si-sub">' + r.d + '</div></div>' +
-      '<span class="chev">' + icon('chevron') + '</span></div>';
+/* ---------- 记录中心（主要体现「记录」主线） ---------- */
+var recordFilter = 'all';
+function recordRow(r) {
+  var p = px(r.patientId);
+  var t = RECORD_TYPES[r.type] || RECORD_TYPES.assessment;
+  return '<div class="rec-item" onclick="goPatient(\'' + r.patientId + '\',\'record\')">' +
+    '<span class="ric" style="background:' + t.color + '22;color:' + t.color + '">' + icon(t.icon) + '</span>' +
+    '<div class="ri-main"><div class="ri-title">' + esc(r.title) + ' <span class="tag neutral">' + t.label + '</span></div>' +
+    '<div class="ri-sum">' + esc(r.summary) + '</div>' +
+    '<div class="ri-meta"><span>' + (p ? esc(p.name) : '') + '</span><span>' + r.time + '</span></div></div>' +
+    '<span class="chev">' + icon('chevron') + '</span></div>';
+}
+function renderRecords() {
+  var cats = [{ k: 'all', t: '全部', n: DB.records.length }].concat(
+    Object.keys(RECORD_TYPES).map(function (k) {
+      return { k: k, t: RECORD_TYPES[k].label, n: DB.records.filter(function (r) { return r.type === k; }).length };
+    })
+  );
+  var chips = cats.map(function (c) {
+    return '<span class="chip' + (recordFilter === c.k ? ' on' : '') + '" onclick="filterRecords(\'' + c.k + '\')">' + c.t + ' (' + c.n + ')</span>';
   }).join('');
-  return '<div class="grid" style="gap:10px">' + html + '</div>';
+
+  var list = DB.records.filter(function (r) { return recordFilter === 'all' || r.type === recordFilter; });
+  var order = [], groups = {};
+  list.forEach(function (r) {
+    if (!groups[r.date]) { groups[r.date] = []; order.push(r.date); }
+    groups[r.date].push(r);
+  });
+  var body = order.map(function (d) {
+    return '<div class="dt-head"><span class="dt-date">' + esc(d) + '</span><span class="dt-count">' + groups[d].length + ' 条</span></div>' +
+      groups[d].map(recordRow).join('');
+  }).join('');
+
+  return (
+    '<div class="card" style="margin-bottom:16px"><div class="card-bd" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between">' +
+      '<div class="chips">' + chips + '</div>' +
+      '<button class="btn btn-primary btn-sm" onclick="openAddRecord()">' + icon('plus') + ' 新增记录</button>' +
+    '</div></div>' +
+    (body || emptyBlock('暂无记录'))
+  );
+}
+function filterRecords(f) {
+  recordFilter = f;
+  document.getElementById('view').innerHTML = renderRecords();
+}
+function renderPatientRecords(p) {
+  var list = DB.records.filter(function (r) { return r.patientId === p.id; });
+  if (!list.length) return emptyBlock('该患者暂无记录');
+  return '<div style="display:flex;flex-direction:column;gap:8px">' + list.map(recordRow).join('') + '</div>';
+}
+function openAddRecord() {
+  var items = Object.keys(RECORD_TYPES).map(function (k) {
+    var t = RECORD_TYPES[k];
+    return '<div class="scale-item" style="flex-direction:column;align-items:flex-start;gap:4px" onclick="closeModal();toast(\'演示：新建 ' + t.label + ' 记录\')">' +
+      '<span class="s-ic" style="background:' + t.color + '22;color:' + t.color + '">' + icon(t.icon) + '</span>' +
+      '<span class="si-name">' + t.label + '</span><span class="si-sub">新增一条' + t.label + '记录</span></div>';
+  }).join('');
+  openModal(
+    '<div class="modal-hd"><span>新增记录</span><span class="x" onclick="closeModal()">×</span></div>' +
+    '<div class="modal-bd"><div class="g2" style="display:grid">' + items + '</div></div>'
+  );
 }
 
 /* ---------- 视图：待办与打卡 ---------- */

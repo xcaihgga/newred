@@ -12,6 +12,7 @@ window.DB = {
   stats: {
     todayAppt: 6,
     todayDone: 4,
+    todayRecords: 5,
     totalPatients: 128,
     pending: 3,
     todos: 5
@@ -172,6 +173,24 @@ window.DB = {
     { key: "Constant", name: "Constant肩关节评分", category: "上肢评估", ic: "m4" },
     { key: "Lysholm", name: "Lysholm膝关节评分", category: "下肢评估", ic: "m4" },
     { key: "Walk6Min", name: "6分钟步行试验", category: "心肺评估", ic: "m5" }
+  ],
+
+  /* 治疗记录（记录中心主线数据） */
+  records: [
+    { id: "r1", patientId: "p-stroke", type: "treatment", title: "治疗记录", summary: "步态训练 + 平衡训练（Bobath）", date: "今天", time: "16:30" },
+    { id: "r2", patientId: "p-lumbar", type: "treatment", title: "治疗记录", summary: "骨盆牵引 20min + 中频电疗", date: "今天", time: "14:00" },
+    { id: "r3", patientId: "p-stroke", type: "scale", title: "Berg 平衡量表", summary: "18/56 · 高跌倒风险", date: "今天", time: "10:35" },
+    { id: "r4", patientId: "p-stroke", type: "scale", title: "Barthel 指数", summary: "35/100 · 中度依赖", date: "今天", time: "10:30" },
+    { id: "r5", patientId: "p-lumbar", type: "assessment", title: "主诉评估", summary: "主诉完成 · VAS 7/10 · 直腿抬高右侧(+)", date: "今天", time: "09:30" },
+    { id: "r6", patientId: "p-cervical", type: "plan", title: "康复方案", summary: "三阶段方案更新（脊髓型颈椎病）", date: "昨天", time: "15:40" },
+    { id: "r7", patientId: "p-stroke", type: "exam", title: "巴宾斯基征", summary: "阳性 · 神经科特殊检查", date: "昨天", time: "15:20" },
+    { id: "r8", patientId: "p-cervical", type: "assessment", title: "主诉评估", summary: "四肢麻木 · Hoffmann 征(+)", date: "昨天", time: "15:00" },
+    { id: "r9", patientId: "p-lumbar", type: "scale", title: "Oswestry 功能障碍", summary: "58% · 重度功能障碍", date: "昨天", time: "11:00" },
+    { id: "r10", patientId: "p-stroke", type: "plan", title: "康复方案", summary: "Bobath 技术 · 三阶段方案制定", date: "3天前", time: "14:00" },
+    { id: "r11", patientId: "p-tka", type: "photo", title: "体态照片", summary: "左膝正侧位照片 2 张", date: "3天前", time: "09:15" },
+    { id: "r12", patientId: "p-tka", type: "scale", title: "Lysholm 膝关节评分", summary: "72/100 · 中等恢复", date: "3天前", time: "09:00" },
+    { id: "r13", patientId: "p-shoulder", type: "scale", title: "Constant 肩关节评分", summary: "42/100 · 差，需积极康复", date: "1周前", time: "10:10" },
+    { id: "r14", patientId: "p-shoulder", type: "exam", title: "Neer 撞击试验", summary: "阳性 · 肩关节特殊检查", date: "1周前", time: "10:00" }
   ]
 };
 
