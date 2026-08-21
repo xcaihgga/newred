@@ -2,6 +2,8 @@
  * state.js - 全局状态 Store（发布-订阅模式）
  * 实现单向数据流：dispatch(action) → reducers → notify subscribers
  * ============================================================ */
+if (window.__REHAB_STATE_LOADED__) return;
+window.__REHAB_STATE_LOADED__ = true;
 
 function createStore(initialState) {
   let state = JSON.parse(JSON.stringify(initialState));

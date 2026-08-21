@@ -2,6 +2,8 @@
  * views/dashboard.js - 概览页视图
  * 展示欢迎横幅、统计卡片、今日预约、待办、快捷入口、打卡进度
  * ============================================================ */
+if (window.__REHAB_VIEW_DASHBOARD_LOADED__) return;
+window.__REHAB_VIEW_DASHBOARD_LOADED__ = true;
 
 /* ---------- 路由注册 ---------- */
 function registerRoutes(router, store) {

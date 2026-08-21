@@ -2,6 +2,8 @@
  * views/fee.js - 收费项目视图
  * 展示收费项目卡片网格，支持分类筛选、新增/删除、统计
  * ============================================================ */
+if (window.__REHAB_VIEW_FEE_LOADED__) return;
+window.__REHAB_VIEW_FEE_LOADED__ = true;
 
 /* ---------- 路由注册 ---------- */
 function registerRoutes(router, store) {

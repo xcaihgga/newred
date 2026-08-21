@@ -2,6 +2,8 @@
  * views/assess.js - 评估记录视图
  * 分步评估表单：主诉、触诊、ROM、肌力、ADL，提交生成评估记录
  * ============================================================ */
+if (window.__REHAB_VIEW_ASSESS_LOADED__) return;
+window.__REHAB_VIEW_ASSESS_LOADED__ = true;
 
 /* ---------- 路由注册 ---------- */
 function registerRoutes(router, store) {

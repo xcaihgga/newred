@@ -2,6 +2,8 @@
  * utils/esc.js - HTML 转义工具
  * 防止 XSS 攻击
  * ============================================================ */
+if (window.__REHAB_ESC_LOADED__) return;
+window.__REHAB_ESC_LOADED__ = true;
 
 function esc(str) {
   if (str == null) return '';

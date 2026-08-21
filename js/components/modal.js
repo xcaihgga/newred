@@ -1,6 +1,8 @@
 /* ============================================================
  * components/modal.js - Modal 对话框组件
  * ============================================================ */
+if (window.__REHAB_MODAL_LOADED__) return;
+window.__REHAB_MODAL_LOADED__ = true;
 
 function open(options) {
   options = options || {};

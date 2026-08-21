@@ -2,6 +2,8 @@
  * bootstrap.js - 应用启动引导
  * 顺序：加载数据 → 初始化 Store → 注册路由 → 渲染 Shell → 启动
  * ============================================================ */
+if (window.__REHAB_BOOTSTRAP_LOADED__) return;
+window.__REHAB_BOOTSTRAP_LOADED__ = true;
 
 console.log('[Bootstrap] bootstrap.js 已加载');
 console.log('[Bootstrap] window.RehabStorage exists:', typeof window.RehabStorage !== 'undefined');

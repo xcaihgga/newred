@@ -2,6 +2,8 @@
  * router.js - 轻量路由系统
  * 支持 hash 路由、参数解析、生命周期钩子
  * ============================================================ */
+if (window.__REHAB_ROUTER_LOADED__) return;
+window.__REHAB_ROUTER_LOADED__ = true;
 
 const routes = [];
 let currentRoute = null;

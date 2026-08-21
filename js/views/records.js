@@ -2,6 +2,8 @@
  * views/records.js - 记录中心视图
  * 展示记录时间线，支持类型筛选，按日期分组
  * ============================================================ */
+if (window.__REHAB_VIEW_RECORDS_LOADED__) return;
+window.__REHAB_VIEW_RECORDS_LOADED__ = true;
 
 /* ---------- 路由注册 ---------- */
 function registerRoutes(router, store) {

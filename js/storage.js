@@ -2,6 +2,8 @@
  * storage.js - localStorage 持久化层
  * 职责：读取、写入、迁移、备份、恢复
  * ============================================================ */
+if (window.__REHAB_STORAGE_LOADED__) return;
+window.__REHAB_STORAGE_LOADED__ = true;
 
 const STORAGE_KEY = 'rehab_workbench_data';
 const META_KEY = 'rehab_workbench_meta';

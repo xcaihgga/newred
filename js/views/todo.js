@@ -2,6 +2,8 @@
  * views/todo.js - 待办列表视图
  * 展示未完成待办数、今日/本周/已完成 分组，支持勾选与新增
  * ============================================================ */
+if (window.__REHAB_VIEW_TODO_LOADED__) return;
+window.__REHAB_VIEW_TODO_LOADED__ = true;
 
 /* ---------- 路由注册 ---------- */
 function registerRoutes(router, store) {

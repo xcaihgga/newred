@@ -1,6 +1,8 @@
 /* ============================================================
  * components/toast.js - 轻量 Toast 提示组件
  * ============================================================ */
+if (window.__REHAB_TOAST_LOADED__) return;
+window.__REHAB_TOAST_LOADED__ = true;
 
 let toastTimer = null;
 

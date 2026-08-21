@@ -2,6 +2,8 @@
  * views/patient-detail.js - 患者详情视图
  * 展示患者基本信息、评估、记录、方案三个 Tab，支持返回
  * ============================================================ */
+if (window.__REHAB_VIEW_PATIENT_DETAIL_LOADED__) return;
+window.__REHAB_VIEW_PATIENT_DETAIL_LOADED__ = true;
 
 /* ---------- 路由注册 ---------- */
 function registerRoutes(router, store) {

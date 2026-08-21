@@ -2,6 +2,8 @@
  * schema.js - 数据模型定义 + 校验
  * 所有数据结构的"单一事实来源"
  * ============================================================ */
+if (window.__REHAB_SCHEMA_LOADED__) return;
+window.__REHAB_SCHEMA_LOADED__ = true;
 
 const DB_VERSION = 1;
 const STORAGE_KEY = 'rehab_workbench_data';

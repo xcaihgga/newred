@@ -2,6 +2,8 @@
  * views/plan.js - 康复方案视图
  * 按急性期 / 亚急性期 / 慢性期三阶段制定可编辑康复方案
  * ============================================================ */
+if (window.__REHAB_VIEW_PLAN_LOADED__) return;
+window.__REHAB_VIEW_PLAN_LOADED__ = true;
 
 /* ---------- 路由注册 ---------- */
 function registerRoutes(router, store) {

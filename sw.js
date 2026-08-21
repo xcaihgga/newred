@@ -1,4 +1,5 @@
-var CACHE_NAME='rehab-workbench-v3.0';
+var CACHE_NAME='rehab-workbench-v5.0';
+
 var ASSETS=[
   './',
   './index.html',
@@ -47,7 +48,7 @@ self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(keys.map(function(k) {
-        return caches.delete(k);
+        if (k !== CACHE_NAME) return caches.delete(k);
       }));
     }).then(function() {
       return self.clients.claim();
@@ -63,15 +64,29 @@ self.addEventListener('message', function(e) {
 
 self.addEventListener('fetch', function(e) {
   if (e.request.method !== 'GET') return;
+  
+  var url = new URL(e.request.url);
+  
+  if (e.request.headers.get('accept') && e.request.headers.get('accept').indexOf('text/html') !== -1) {
+    e.respondWith(
+      fetch(e.request).then(function(resp) {
+        var copy = resp.clone();
+        caches.open(CACHE_NAME).then(function(c) { c.put(e.request, copy).catch(function(){}); });
+        return resp;
+      }).catch(function() {
+        return caches.match('./index.html');
+      })
+    );
+    return;
+  }
+  
   e.respondWith(
     caches.match(e.request).then(function(cached) {
       if (cached) return cached;
       return fetch(e.request).then(function(resp) {
-        if (resp && resp.status === 200 && e.request.url.startsWith(self.location.origin)) {
-          var respClone = resp.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(e.request, respClone).catch(function(){});
-          });
+        if (resp && resp.status === 200 && url.origin === self.location.origin) {
+          var copy = resp.clone();
+          caches.open(CACHE_NAME).then(function(c) { c.put(e.request, copy).catch(function(){}); });
         }
         return resp;
       }).catch(function() {

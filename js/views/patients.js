@@ -2,6 +2,8 @@
  * views/patients.js - 患者列表视图
  * 展示患者卡片网格，支持本地搜索筛选，点击进入详情
  * ============================================================ */
+if (window.__REHAB_VIEW_PATIENTS_LOADED__) return;
+window.__REHAB_VIEW_PATIENTS_LOADED__ = true;
 
 /* ---------- 路由注册 ---------- */
 function registerRoutes(router, store) {
