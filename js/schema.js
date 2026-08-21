@@ -6,7 +6,7 @@ if (window.__REHAB_SCHEMA_LOADED__) return;
 window.__REHAB_SCHEMA_LOADED__ = true;
 
 const DB_VERSION = 1;
-const STORAGE_KEY = 'rehab_workbench_data';
+const SCHEMA_STORAGE_KEY = 'rehab_workbench_data';
 
 /* ---------- 校验规则 ---------- */
 const VALIDATORS = {
@@ -139,7 +139,7 @@ function applyMigration(data, version) {
 
 window.Schema = {
   DB_VERSION: DB_VERSION,
-  STORAGE_KEY: STORAGE_KEY,
+  STORAGE_KEY: SCHEMA_STORAGE_KEY,
   VALIDATORS: VALIDATORS,
   validateRecord: validateRecord,
   validateData: validateData,
