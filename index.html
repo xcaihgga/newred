@@ -104,11 +104,19 @@
 <script src="js/bootstrap.js"></script>
 
 <script>
-/* PWA 注册 - 支持自动更新 */
+/* PWA 注册 - 强制切换到新SW，清理旧SW */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw.js?v=3').then(function(registration) {
-      console.log('Service Worker 已注册, scope:', registration.scope);
+    navigator.serviceWorker.getRegistrations().then(function(regs) {
+      regs.forEach(function(reg) {
+        if (reg.scope && reg.scope.includes('/newred/')) {
+          reg.unregister();
+        }
+      });
+    });
+    
+    navigator.serviceWorker.register('sw-v4.js').then(function(registration) {
+      console.log('Service Worker v4 已注册, scope:', registration.scope);
       
       registration.addEventListener('updatefound', function() {
         var newWorker = registration.installing;
