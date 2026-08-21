@@ -1,5 +1,15 @@
-var CACHE_NAME='rehab-v3.9.3';
-var ASSETS=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png','js/bootstrap.js','js/utils.js','js/storage-sync.js','js/schema.js','js/data-model.js','js/dirty-router.js','js/route-handlers.js'];
+var CACHE_NAME='rehab-workbench-v1.0';
+var ASSETS=[
+  './',
+  './index.html',
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  './assets/greet-banner.jpg',
+  './styles.css',
+  './app.js',
+  './mock.js'
+];
 self.addEventListener('install',function(e){
   e.waitUntil(
     caches.open(CACHE_NAME).then(function(cache){
@@ -20,7 +30,6 @@ self.addEventListener('activate',function(e){
     })
   );
 });
-// 响应页面发来的 SKIP_WAITING 消息，立即激活新 SW
 self.addEventListener('message',function(e){
   if(e.data==='SKIP_WAITING'){
     self.skipWaiting();

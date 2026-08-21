@@ -1,12 +1,13 @@
 {
-  "name": "康复评估记录系统",
-  "short_name": "康复评估",
-  "description": "康复治疗师评估记录系统 - 患者管理/评估/量表/康复方案/拍照记录",
-  "start_url": "./index.html",
+  "name": "个人康复工作台",
+  "short_name": "康复工作台",
+  "description": "康复治疗师一站式工作台 · 日程 / 患者 / 评估 / 量表 / 方案 / 记录",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f0f2f5",
-  "theme_color": "#3182ce",
+  "background_color": "#f5f8f7",
+  "theme_color": "#0e9488",
   "lang": "zh-CN",
   "icons": [
     {
