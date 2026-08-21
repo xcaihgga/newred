@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Minimal Test</title></head>
+<body>
+<div id="result">Script not executed</div>
+<script src="js/utils/esc.js?v=3"></script>
+<script>
+  document.getElementById('result').textContent = 'Esc loaded: ' + (typeof window.Esc !== 'undefined');
+  window.__MINIMAL_DONE__ = true;
+</script>
+</body>
+</html>
