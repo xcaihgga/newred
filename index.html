@@ -107,7 +107,7 @@
 /* PWA 注册 - 支持自动更新 */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw.js').then(function(registration) {
+    navigator.serviceWorker.register('sw.js?v=3').then(function(registration) {
       console.log('Service Worker 已注册, scope:', registration.scope);
       
       registration.addEventListener('updatefound', function() {
