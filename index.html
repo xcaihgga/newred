@@ -78,17 +78,59 @@
   <button id="pwa_install_close" style="background:none;border:none;font-size:18px;color:#999;padding:0 4px">×</button>
 </div>
 
-<script src="mock.js"></script>
-<script src="app.js"></script>
+<script src="js/utils/esc.js?v=2"></script>
+<script src="js/utils/date.js?v=2"></script>
+<script src="js/utils/export.js?v=2"></script>
+<script src="js/schema.js?v=2"></script>
+<script src="js/storage.js?v=2"></script>
+<script src="js/state.js?v=2"></script>
+<script src="js/seed.js?v=2"></script>
+<script src="js/components/icons.js?v=2"></script>
+<script src="js/components/toast.js?v=2"></script>
+<script src="js/components/modal.js?v=2"></script>
+<script src="js/components/shell.js?v=2"></script>
+<script src="js/views/dashboard.js?v=2"></script>
+<script src="js/views/schedule.js?v=2"></script>
+<script src="js/views/records.js?v=2"></script>
+<script src="js/views/patients.js?v=2"></script>
+<script src="js/views/patient-detail.js?v=2"></script>
+<script src="js/views/todo.js?v=2"></script>
+<script src="js/views/assess.js?v=2"></script>
+<script src="js/views/scale.js?v=2"></script>
+<script src="js/views/plan.js?v=2"></script>
+<script src="js/views/fee.js?v=2"></script>
+<script src="js/views/settings.js?v=2"></script>
+<script src="js/router.js?v=2"></script>
+<script src="js/bootstrap.js?v=2"></script>
 
 <script>
-/* PWA 注册 */
+/* PWA 注册 - 支持自动更新 */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw.js').then(function() {
-      console.log('Service Worker 已注册');
+    navigator.serviceWorker.register('sw.js').then(function(registration) {
+      console.log('Service Worker 已注册, scope:', registration.scope);
+      
+      registration.addEventListener('updatefound', function() {
+        var newWorker = registration.installing;
+        console.log('发现新的 Service Worker');
+        
+        newWorker.addEventListener('statechange', function() {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            console.log('新 SW 已安装，正在激活...');
+            newWorker.postMessage({ type: 'SKIP_WAITING' });
+          }
+        });
+      });
     }).catch(function(err) {
       console.log('SW 注册失败：', err);
+    });
+    
+    var refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
     });
   });
 }

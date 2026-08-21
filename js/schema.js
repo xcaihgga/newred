@@ -1,107 +1,146 @@
-// ===== schema.js auto-generated =====
-var SCHEMA_VERSION=3;
-var SCHEMA_KEY='_schema_version';
-var DATA_KEYS=['therapist_profiles','active_profile_id','patients','records','assessments','specialExams','scales','plans','customExams','customScales','userRole','auditLog','pinHash'];
+/* ============================================================
+ * schema.js - 数据模型定义 + 校验
+ * 所有数据结构的"单一事实来源"
+ * ============================================================ */
 
-// 返回当前存储 schema 版本（未初始化时为 0）
-function getStoredSchemaVersion(){var v=LS.get(SCHEMA_KEY);return (typeof v==='number'&&v>=0)?v:0}
+const DB_VERSION = 1;
+const STORAGE_KEY = 'rehab_workbench_data';
 
-// 迁移：每次升级写一个明确的 from→to 步骤，幂等、可重入
-function migrateSchema(from,to){
-  var log=[];
-  function step(cur,fn){
-    if(from<=cur&&to>cur){try{fn();log.push('v'+(cur+1)+':ok')}catch(e){log.push('v'+(cur+1)+':fail '+e.message)}}
+/* ---------- 校验规则 ---------- */
+const VALIDATORS = {
+  patient: function (p) {
+    const errors = [];
+    if (!p.id || typeof p.id !== 'string') errors.push('patient.id 必填且为字符串');
+    if (!p.name || typeof p.name !== 'string') errors.push('patient.name 必填且为字符串');
+    if (!['男', '女'].includes(p.gender)) errors.push('patient.gender 必须为"男"或"女"');
+    if (typeof p.age !== 'number' || p.age < 0 || p.age > 150) errors.push('patient.age 必须为 0-150 的数字');
+    return errors;
+  },
+  record: function (r) {
+    const errors = [];
+    if (!r.id || typeof r.id !== 'string') errors.push('record.id 必填');
+    if (!r.patientId) errors.push('record.patientId 必填');
+    if (!['assessment', 'exam', 'scale', 'plan', 'treatment', 'photo'].includes(r.type)) {
+      errors.push('record.type 必须为合法类型');
+    }
+    if (!r.title || typeof r.title !== 'string') errors.push('record.title 必填');
+    return errors;
+  },
+  todo: function (t) {
+    const errors = [];
+    if (!t.id) errors.push('todo.id 必填');
+    if (!t.text || typeof t.text !== 'string') errors.push('todo.text 必填');
+    if (!['high', 'mid', 'low'].includes(t.level)) errors.push('todo.level 必须为 high/mid/low');
+    if (typeof t.done !== 'boolean') errors.push('todo.done 必须为布尔值');
+    return errors;
+  },
+  appointment: function (a) {
+    const errors = [];
+    if (!a.id) errors.push('appointment.id 必填');
+    if (!a.patientId) errors.push('appointment.patientId 必填');
+    if (!a.time || !a.date) errors.push('appointment.time 和 date 必填');
+    return errors;
   }
-  // v0→1: 旧版无 schema，确保 auditLog/pinHash 容器存在
-  step(0,function(){
-    if(!LS.get('auditLog'))LS.set('auditLog',[]);
-    if(!LS.get('pinHash'))LS.set('pinHash','');
-  });
-  // v1→2: records 缺字段补默认（向后兼容旧导出）
-  step(1,function(){
-    var rs=getRecords();
-    rs.forEach(function(r){
-      if(typeof r.photoId==='undefined')r.photoId=null;
-      if(typeof r.timestamp!=='number')r.timestamp=Date.now();
-    });
-    setRecords(rs);
-  });
-  // v2→3: patients 缺 createdBy 标记为 'legacy'（便于权限判定）
-  step(2,function(){
-    var ps=getPatients();
-    ps.forEach(function(p){if(!p.createdBy)p.createdBy='legacy'});
-    setPatients(ps);
-  });
-  LS.set(SCHEMA_KEY,to);
-  console.log('[schema] migrated',from,'→',to,'|',log.join(', '));
-  return log;
-}
-
-// 启动时自动迁移（包在 try 内，失败不影响加载）
-function ensureSchemaMigrated(){
-  try{
-    var cur=getStoredSchemaVersion();
-    if(cur===SCHEMA_VERSION){return{ok:true,from:cur,to:cur,log:['noop']}}
-    var before=cur;
-    var log=migrateSchema(cur,SCHEMA_VERSION);
-    return{ok:true,from:before,to:SCHEMA_VERSION,log:log};
-  }catch(e){
-    console.error('[schema] migration failed:',e);
-    return{ok:false,error:e.message};
-  }
-}
-// ===== A-1 数据层校验（schema validators）=====
-function _isPlainObject(v){ return v && typeof v==='object' && !Array.isArray(v) }
-function _isStr(v,max){return typeof v==='string' && (max===undefined || v.length<=max)}
-function _isStrNonEmpty(v,max){return _isStr(v,max) && v.length>0}
-
-var _VALIDATORS={
-  therapist_profiles: function(v){
-    if(!Array.isArray(v))return ['必须是数组'];var e=[];
-    v.forEach(function(x,i){if(!_isPlainObject(x))e.push('['+i+']不是对象');else{if(!_isStrNonEmpty(x.id))e.push('['+i+'].id缺失');if(!_isStrNonEmpty(x.name))e.push('['+i+'].name缺失');}});
-    return e;
-  },
-  patients: function(v){
-    if(!Array.isArray(v))return ['必须是数组'];var e=[];
-    v.forEach(function(x,i){
-      if(!_isPlainObject(x))e.push('['+i+']不是对象');
-      else{
-        if(!_isStrNonEmpty(x.id))e.push('['+i+'].id缺失');
-        if(!_isStrNonEmpty(x.patientId))e.push('['+i+'].patientId缺失');
-        if(!_isStrNonEmpty(x.name))e.push('['+i+'].name缺失');
-        if(typeof x.createdAt!=='number'||isNaN(x.createdAt))e.push('['+i+'].createdAt非法');
-      }
-    });
-    return e;
-  },
-  assessments: function(v){if(!_isPlainObject(v))return['必须是对象'];var e=[];for(var k in v)if(v.hasOwnProperty(k)&&!_isPlainObject(v[k]))e.push(k+':不是对象');return e;},
-  scales: function(v){if(!_isPlainObject(v))return['必须是对象'];var e=[];for(var k in v)if(v.hasOwnProperty(k)&&!Array.isArray(v[k]))e.push(k+':必须是数组');return e;},
-  specialExams: function(v){if(!_isPlainObject(v))return['必须是对象'];var e=[];for(var k in v)if(v.hasOwnProperty(k)&&!Array.isArray(v[k]))e.push(k+':必须是数组');return e;},
-  plans: function(v){if(!_isPlainObject(v))return['必须是对象'];var e=[];for(var k in v)if(v.hasOwnProperty(k)&&!_isPlainObject(v[k]))e.push(k+':不是对象');return e;},
-  records: function(v){
-    if(!Array.isArray(v))return ['必须是数组'];var e=[];
-    v.forEach(function(x,i){
-      if(!_isPlainObject(x))e.push('['+i+']不是对象');
-      else{
-        if(!_isStrNonEmpty(x.id))e.push('['+i+'].id缺失');
-        if(!_isStrNonEmpty(x.patientId))e.push('['+i+'].patientId缺失');
-        if(typeof x.timestamp!=='number'||isNaN(x.timestamp))e.push('['+i+'].timestamp非法');
-      }
-    });
-    return e;
-  },
-  customExams: function(v){return Array.isArray(v)?[]:['必须是数组'];},
-  customScales: function(v){return Array.isArray(v)?[]:['必须是数组'];},
-  auditLog: function(v){return Array.isArray(v)?[]:['必须是数组'];},
-  active_profile_id: function(v){return v===null||v===undefined||_isStr(v,100)?[]:['必须是字符串或null'];},
-  userRole: function(v){return(v===null||v==='therapist'||v==='director'||v==='admin'||_isStr(v,50))?[]:['角色非法'];},
-  pinHash: function(v){return _isStr(v,100)?[]:['必须是字符串'];},
-  _schema_version: function(v){return(typeof v==='number'&&v>=0&&!isNaN(v))?[]:['必须是非负整数'];},
 };
 
-function validateData(k, v){
-  var fn=_VALIDATORS[k];
-  if(!fn)return {ok:true,warn:'未定义校验器'};
-  try{var errs=fn(v);return (errs&&errs.length)?{ok:false,errors:errs}:{ok:true};}
-  catch(e){return {ok:false,errors:['校验器异常: '+(e.message||e)]};}
+/* ---------- 数据完整性检查 ---------- */
+function validateRecord(record, type) {
+  const validator = VALIDATORS[type];
+  if (!validator) return [];
+  return validator(record);
 }
+
+function validateData(data) {
+  const errors = [];
+  if (!data || typeof data !== 'object') {
+    return ['数据必须为对象'];
+  }
+  const checks = [
+    ['patients', 'array'],
+    ['records', 'array'],
+    ['todos', 'array'],
+    ['appointments', 'array'],
+    ['checkins', 'array'],
+    ['therapist', 'object'],
+    ['stats', 'object']
+  ];
+  checks.forEach(function ([key, expectedType]) {
+    if (data[key] == null) {
+      errors.push('data.' + key + ' 缺失');
+    } else if (expectedType === 'array' && !Array.isArray(data[key])) {
+      errors.push('data.' + key + ' 必须为数组');
+    } else if (expectedType === 'object' && typeof data[key] !== 'object') {
+      errors.push('data.' + key + ' 必须为对象');
+    }
+  });
+  if (data.patients && Array.isArray(data.patients)) {
+    data.patients.forEach(function (p) {
+      validateRecord(p, 'patient').forEach(function (e) {
+        errors.push('patient ' + p.id + ': ' + e);
+      });
+    });
+  }
+  if (data.records && Array.isArray(data.records)) {
+    data.records.forEach(function (r) {
+      validateRecord(r, 'record').forEach(function (e) {
+        errors.push('record ' + r.id + ': ' + e);
+      });
+    });
+  }
+  return errors;
+}
+
+/* ---------- 修复缺失字段 ---------- */
+function repairData(data) {
+  if (!data) return null;
+  if (!data.therapist) {
+    data.therapist = { name: '张医生', department: '康复医学科', role: '主管治疗师', avatar: '张' };
+  }
+  if (!data.stats) {
+    data.stats = { todayAppt: 0, todayDone: 0, todayRecords: 0, totalPatients: 0, pending: 0, todos: 0 };
+  }
+  ['patients', 'records', 'todos', 'appointments', 'checkins'].forEach(function (key) {
+    if (!Array.isArray(data[key])) data[key] = [];
+  });
+  return data;
+}
+
+/* ---------- 版本迁移 ---------- */
+function migrateData(data, fromVersion, toVersion) {
+  let result = JSON.parse(JSON.stringify(data));
+  for (let v = fromVersion; v < toVersion; v++) {
+    result = applyMigration(result, v);
+  }
+  return result;
+}
+
+function applyMigration(data, version) {
+  const migrations = {
+    0: function (d) {
+      return d;
+    },
+    1: function (d) {
+      const patients = (d.patients || []).map(function (p) {
+        if (!p.createdAt) p.createdAt = Date.now();
+        if (!p.updatedAt) p.updatedAt = Date.now();
+        return p;
+      });
+      const records = (d.records || []).map(function (r) {
+        if (!r.createdAt) r.createdAt = Date.now();
+        return r;
+      });
+      return Object.assign({}, d, { patients: patients, records: records });
+    }
+  };
+  return (migrations[version] || function (d) { return d; })(data);
+}
+
+window.Schema = {
+  DB_VERSION: DB_VERSION,
+  STORAGE_KEY: STORAGE_KEY,
+  VALIDATORS: VALIDATORS,
+  validateRecord: validateRecord,
+  validateData: validateData,
+  repairData: repairData,
+  migrateData: migrateData
+};

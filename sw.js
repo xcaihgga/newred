@@ -1,4 +1,4 @@
-var CACHE_NAME='rehab-workbench-v1.0';
+var CACHE_NAME='rehab-workbench-v2.1';
 var ASSETS=[
   './',
   './index.html',
@@ -7,8 +7,30 @@ var ASSETS=[
   './icon-512.png',
   './assets/greet-banner.jpg',
   './styles.css',
-  './app.js',
-  './mock.js'
+  './js/utils/esc.js?v=2',
+  './js/utils/date.js?v=2',
+  './js/utils/export.js?v=2',
+  './js/schema.js?v=2',
+  './js/storage.js?v=2',
+  './js/state.js?v=2',
+  './js/seed.js?v=2',
+  './js/components/icons.js?v=2',
+  './js/components/toast.js?v=2',
+  './js/components/modal.js?v=2',
+  './js/components/shell.js?v=2',
+  './js/router.js?v=2',
+  './js/bootstrap.js?v=2',
+  './js/views/dashboard.js?v=2',
+  './js/views/schedule.js?v=2',
+  './js/views/records.js?v=2',
+  './js/views/patients.js?v=2',
+  './js/views/patient-detail.js?v=2',
+  './js/views/todo.js?v=2',
+  './js/views/assess.js?v=2',
+  './js/views/scale.js?v=2',
+  './js/views/plan.js?v=2',
+  './js/views/fee.js?v=2',
+  './js/views/settings.js?v=2'
 ];
 self.addEventListener('install',function(e){
   e.waitUntil(
