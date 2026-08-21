@@ -2,8 +2,10 @@
  * views/schedule.js - 日程管理视图
  * 展示预约列表时间线，支持今天/本周切换筛选
  * ============================================================ */
-if (window.__REHAB_VIEW_SCHEDULE_LOADED__) return;
-window.__REHAB_VIEW_SCHEDULE_LOADED__ = true;
+(function() {
+  if (window.__REHAB_VIEW_SCHEDULE_LOADED__) return;
+  window.__REHAB_VIEW_SCHEDULE_LOADED__ = true;
+
 
 /* ---------- 路由注册 ---------- */
 function registerRoutes(router, store) {
@@ -123,4 +125,4 @@ function renderSchedule(state) {
 window.ScheduleView = {
   registerRoutes: registerRoutes,
   render: renderSchedule
-};
+};})();

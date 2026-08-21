@@ -2,8 +2,10 @@
  * components/icons.js - SVG 图标集合
  * 每个图标返回一个字符串，可直接插入 innerHTML
  * ============================================================ */
-if (window.__REHAB_ICONS_LOADED__) return;
-window.__REHAB_ICONS_LOADED__ = true;
+(function() {
+  if (window.__REHAB_ICONS_LOADED__) return;
+  window.__REHAB_ICONS_LOADED__ = true;
+
 
 const ICONS = {
   menu: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>',
@@ -45,3 +47,4 @@ function iconSvg(name) {
 
 window.Icons = ICONS;
 window.getIcon = getIcon;
+})();

@@ -2,8 +2,10 @@
  * seed.js - 初始种子数据
  * 当 localStorage 为空时使用
  * ============================================================ */
-if (window.__REHAB_SEED_LOADED__) return;
-window.__REHAB_SEED_LOADED__ = true;
+(function() {
+  if (window.__REHAB_SEED_LOADED__) return;
+  window.__REHAB_SEED_LOADED__ = true;
+
 
 const SEED_DATA = {
   therapist: {
@@ -208,3 +210,4 @@ window.Seed = {
     return SEED_DATA.patients.find(function (p) { return p.id === id; });
   }
 };
+})();

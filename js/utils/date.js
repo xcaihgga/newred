@@ -1,8 +1,10 @@
 /* ============================================================
  * utils/date.js - 日期工具函数
  * ============================================================ */
-if (window.__REHAB_DATE_LOADED__) return;
-window.__REHAB_DATE_LOADED__ = true;
+(function() {
+  if (window.__REHAB_DATE_LOADED__) return;
+  window.__REHAB_DATE_LOADED__ = true;
+
 
 function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
@@ -50,3 +52,4 @@ window.DateUtil = {
   relativeTime: relativeTime,
   todayStr: todayStr
 };
+})();

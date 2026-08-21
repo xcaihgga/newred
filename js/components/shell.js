@@ -2,8 +2,10 @@
  * components/shell.js - Shell 组件
  * 负责：导航渲染、事件绑定、全局交互
  * ============================================================ */
-if (window.__REHAB_SHELL_LOADED__) return;
-window.__REHAB_SHELL_LOADED__ = true;
+(function() {
+  if (window.__REHAB_SHELL_LOADED__) return;
+  window.__REHAB_SHELL_LOADED__ = true;
+
 
 const NAV_CONFIG = [
   { key: 'home', path: '/', label: '概览', ic: 'home' },
@@ -228,3 +230,4 @@ window.Shell = {
   renderTabbar: renderTabbar,
   NAV_CONFIG: NAV_CONFIG
 };
+})();

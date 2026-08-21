@@ -1,8 +1,10 @@
 /* ============================================================
  * components/toast.js - 轻量 Toast 提示组件
  * ============================================================ */
-if (window.__REHAB_TOAST_LOADED__) return;
-window.__REHAB_TOAST_LOADED__ = true;
+(function() {
+  if (window.__REHAB_TOAST_LOADED__) return;
+  window.__REHAB_TOAST_LOADED__ = true;
+
 
 let toastTimer = null;
 
@@ -45,3 +47,4 @@ function warn(message, duration) { show(message, 'warn', duration); }
 function error(message, duration) { show(message, 'error', duration); }
 
 window.Toast = { show: show, info: info, success: success, warn: warn, error: error };
+})();

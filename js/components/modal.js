@@ -1,8 +1,10 @@
 /* ============================================================
  * components/modal.js - Modal 对话框组件
  * ============================================================ */
-if (window.__REHAB_MODAL_LOADED__) return;
-window.__REHAB_MODAL_LOADED__ = true;
+(function() {
+  if (window.__REHAB_MODAL_LOADED__) return;
+  window.__REHAB_MODAL_LOADED__ = true;
+
 
 function open(options) {
   options = options || {};
@@ -102,3 +104,4 @@ function promptMsg(title, placeholder, defaultValue, onSubmit) {
 }
 
 window.Modal = { open: open, alert: alertMsg, confirm: confirmMsg, prompt: promptMsg };
+})();

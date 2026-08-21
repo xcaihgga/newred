@@ -2,8 +2,10 @@
  * views/settings.js - 系统设置视图
  * 展示治疗师信息编辑、数据管理（导出/导入/重置/备份）、存储状态、关于
  * ============================================================ */
-if (window.__REHAB_VIEW_SETTINGS_LOADED__) return;
-window.__REHAB_VIEW_SETTINGS_LOADED__ = true;
+(function() {
+  if (window.__REHAB_VIEW_SETTINGS_LOADED__) return;
+  window.__REHAB_VIEW_SETTINGS_LOADED__ = true;
+
 
 /* ---------- 路由注册 ---------- */
 function registerRoutes(router, store) {
@@ -238,3 +240,4 @@ window.SettingsView = {
     backup: handleBackup
   }
 };
+})();

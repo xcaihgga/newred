@@ -2,8 +2,10 @@
  * views/scale.js - 量表库视图
  * 展示按分类筛选的量表卡片，支持查看详情、对患者使用
  * ============================================================ */
-if (window.__REHAB_VIEW_SCALE_LOADED__) return;
-window.__REHAB_VIEW_SCALE_LOADED__ = true;
+(function() {
+  if (window.__REHAB_VIEW_SCALE_LOADED__) return;
+  window.__REHAB_VIEW_SCALE_LOADED__ = true;
+
 
 /* ---------- 路由注册 ---------- */
 function registerRoutes(router, store) {
@@ -323,3 +325,4 @@ window.ScaleView = {
   _library: SCALE_LIBRARY,
   _openDetail: openScaleDetail
 };
+})();

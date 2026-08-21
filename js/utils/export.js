@@ -1,8 +1,10 @@
 /* ============================================================
  * utils/export.js - 数据导出导入封装
  * ============================================================ */
-if (window.__REHAB_EXPORT_LOADED__) return;
-window.__REHAB_EXPORT_LOADED__ = true;
+(function() {
+  if (window.__REHAB_EXPORT_LOADED__) return;
+  window.__REHAB_EXPORT_LOADED__ = true;
+
 
 function exportData() {
   if (!window.RehabStorage) return false;
@@ -40,3 +42,4 @@ window.DataIO = {
   reset: resetData,
   backup: backupNow
 };
+})();
