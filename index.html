@@ -107,8 +107,18 @@
 /* PWA 注册 - 自动更新 */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw.js').then(function(registration) {
+    navigator.serviceWorker.register('sw-v6.js').then(function(registration) {
       console.log('Service Worker 已注册, scope:', registration.scope);
+      
+      // Unregister old SW if it exists
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        regs.forEach(function(reg) {
+          if (reg.active && reg.active.scriptURL.indexOf('sw.js') !== -1 && reg.active.scriptURL.indexOf('sw-v6') === -1) {
+            console.log('注销旧 SW:', reg.active.scriptURL);
+            reg.unregister();
+          }
+        });
+      });
       
       registration.addEventListener('updatefound', function() {
         var newWorker = registration.installing;
