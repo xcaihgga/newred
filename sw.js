@@ -1,4 +1,4 @@
-var CACHE_NAME='rehab-workbench-v5.0';
+var CACHE_NAME='rehab-workbench-v6.0';
 
 var ASSETS=[
   './',
@@ -7,31 +7,7 @@ var ASSETS=[
   './icon-192.png',
   './icon-512.png',
   './assets/greet-banner.jpg',
-  './styles.css',
-  './js/utils/esc.js',
-  './js/utils/date.js',
-  './js/utils/export.js',
-  './js/schema.js',
-  './js/storage.js',
-  './js/state.js',
-  './js/seed.js',
-  './js/components/icons.js',
-  './js/components/toast.js',
-  './js/components/modal.js',
-  './js/components/shell.js',
-  './js/router.js',
-  './js/bootstrap.js',
-  './js/views/dashboard.js',
-  './js/views/schedule.js',
-  './js/views/records.js',
-  './js/views/patients.js',
-  './js/views/patient-detail.js',
-  './js/views/todo.js',
-  './js/views/assess.js',
-  './js/views/scale.js',
-  './js/views/plan.js',
-  './js/views/fee.js',
-  './js/views/settings.js'
+  './styles.css'
 ];
 
 self.addEventListener('install', function(e) {
@@ -64,9 +40,10 @@ self.addEventListener('message', function(e) {
 
 self.addEventListener('fetch', function(e) {
   if (e.request.method !== 'GET') return;
-  
+
   var url = new URL(e.request.url);
-  
+
+  // Network-first for HTML
   if (e.request.headers.get('accept') && e.request.headers.get('accept').indexOf('text/html') !== -1) {
     e.respondWith(
       fetch(e.request).then(function(resp) {
@@ -79,17 +56,18 @@ self.addEventListener('fetch', function(e) {
     );
     return;
   }
-  
+
+  // Network-first for everything else (JS, CSS, images)
   e.respondWith(
-    caches.match(e.request).then(function(cached) {
-      if (cached) return cached;
-      return fetch(e.request).then(function(resp) {
-        if (resp && resp.status === 200 && url.origin === self.location.origin) {
-          var copy = resp.clone();
-          caches.open(CACHE_NAME).then(function(c) { c.put(e.request, copy).catch(function(){}); });
-        }
-        return resp;
-      }).catch(function() {
+    fetch(e.request).then(function(resp) {
+      if (resp && resp.status === 200 && url.origin === self.location.origin) {
+        var copy = resp.clone();
+        caches.open(CACHE_NAME).then(function(c) { c.put(e.request, copy).catch(function(){}); });
+      }
+      return resp;
+    }).catch(function() {
+      return caches.match(e.request).then(function(cached) {
+        if (cached) return cached;
         return caches.match('./index.html');
       });
     })
