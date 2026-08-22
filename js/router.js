@@ -196,7 +196,7 @@ function refresh() {
 }
 
 function updateNavActive(activePath) {
-  document.querySelectorAll('.nav-item').forEach(function (el) {
+  document.querySelectorAll('.nav-item, .tab-item').forEach(function (el) {
     const path = el.getAttribute('data-path');
     if (path === activePath || (path === '/' && activePath === '/')) {
       el.classList.add('active');
