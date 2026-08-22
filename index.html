@@ -13,7 +13,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png">
 <title>个人康复工作台</title>
-<link rel="stylesheet" href="styles.css?v=5">
+<link rel="stylesheet" href="styles.css?v=6">
 </head>
 <body>
 <div class="shell">
@@ -131,7 +131,7 @@
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw-v8.js').then(function(registration) {
+    navigator.serviceWorker.register('sw-v9.js').then(function(registration) {
       console.log('[PWA] Service Worker registered, scope:', registration.scope);
 
       registration.addEventListener('updatefound', function() {
