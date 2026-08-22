@@ -36,8 +36,8 @@ function renderNav(store) {
   const therapist = store.getState().therapist;
   const navItems = NAV_CONFIG.map(function (item) {
     return '<div class="nav-item" data-path="' + item.path + '" data-nav="' + item.path + '">' +
-      '<span class="nav-ic">' + (window.getIcon ? window.getIcon(item.ic) : '') + '</span>' +
-      '<span class="nav-label">' + item.label + '</span>' +
+      '<span class="ic">' + (window.getIcon ? window.getIcon(item.ic) : '') + '</span>' +
+      '<span>' + item.label + '</span>' +
     '</div>';
   }).join('');
 
@@ -75,7 +75,7 @@ function renderTabbar(store) {
 
   tabbar.innerHTML = mobileNav.map(function (item) {
     return '<div class="tab-item" data-path="' + item.path + '" data-nav="' + item.path + '">' +
-      '<div class="tab-ic">' + (window.getIcon ? window.getIcon(item.ic) : '') + '</div>' +
+      (window.getIcon ? window.getIcon(item.ic) : '') +
       '<div class="tab-label">' + item.label + '</div>' +
     '</div>';
   }).join('');
