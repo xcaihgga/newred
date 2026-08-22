@@ -220,4 +220,5 @@ function createGenericReducers(store) {
 }
 
 window.createStore = createStore;
+window.createGenericReducers = createGenericReducers;
 })();

@@ -94,6 +94,11 @@ function bootstrap() {
   const store = window.createStore(data);
   window.Store = store;
 
+  // 注册通用 reducer（否则所有 dispatch 写入都无效）
+  if (typeof window.createGenericReducers === 'function') {
+    window.createGenericReducers(store);
+  }
+
   console.log('[Bootstrap] Store 已初始化');
 
   if (window.Router) {

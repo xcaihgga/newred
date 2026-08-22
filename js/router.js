@@ -143,6 +143,7 @@ function handleRoute() {
         view.innerHTML = html || '<div class="empty-state">页面加载中...</div>';
         bindRouteEvents(route.path);
         bindDynamicEvents();
+        callViewInit(route.path);
       }
     } catch (e) {
       console.error('[Router] 渲染错误:', e);
@@ -183,11 +184,30 @@ function bindDynamicEvents() {
                 type: 'UPDATE_TODO',
                 payload: { id: id, done: !todo.done }
               });
+              handleRoute();
             }
           }
         });
       }
     });
+  }
+}
+
+/* ---------- 渲染后调用当前视图的 init 绑定 ---------- */
+function callViewInit(path) {
+  if (path && path !== '/') {
+    const first = '/' + (path.split('/')[1] || '');
+    const map = {
+      '/todo': window.TodoView,
+      '/settings': window.SettingsView,
+      '/fee': window.FeeView
+    };
+    const view = map[path] || map[first];
+    const container = document.getElementById('view');
+    if (view && typeof view.init === 'function' && container) {
+      try { view.init(container, storeRef); }
+      catch (e) { console.error('[Router] view init error:', e); }
+    }
   }
 }
 

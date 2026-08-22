@@ -38,11 +38,9 @@ function getWeekStartStr() {
 /* ---------- 辅助：判断待办所属分组 ---------- */
 function groupTodo(todo) {
   if (todo.done) return 'done';
-  const today = getTodayStr();
-  const weekStart = getWeekStartStr();
   const due = todo.due || '';
-  if (due === today) return 'today';
-  if (due >= weekStart) return 'week';
+  // due 可能是中文相对时间（今天/本周/昨天）或绝对日期串（YYYY-MM-DD）
+  if (due === '今天' || due === getTodayStr()) return 'today';
   return 'week';
 }
 
@@ -106,34 +104,49 @@ function buildGroup(title, todos, emptyText) {
 
 /* ---------- 辅助：处理新增待办 ---------- */
 function promptAddTodo(store) {
-  const result = window.Modal.prompt('新增待办', '请输入待办内容：');
-  if (!result) return;
-  const text = (result.text || '').trim();
-  if (!text) {
-    window.Modal.toast('内容不能为空');
-    return;
-  }
-  const due = result.due || '';
-  const level = result.level || 'mid';
-  store.dispatch({
-    type: 'ADD_TODO',
-    payload: {
-      id: 'todo_' + Date.now(),
-      text: text,
-      level: level,
-      due: due,
-      done: false
+  window.Modal.prompt('新增待办', '请输入待办内容：', '', function (text) {
+    text = (text || '').trim();
+    if (!text) {
+      window.Toast.warn('内容不能为空');
+      return;
     }
+    if (store && typeof store.dispatch === 'function') {
+      store.dispatch({
+        type: 'ADD_TODO',
+        payload: {
+          id: 'todo_' + Date.now(),
+          text: text,
+          level: 'mid',
+          due: '今天',
+          done: false
+        }
+      });
+    }
+    window.Toast.success('已添加');
+    if (window.Router && typeof window.Router.refresh === 'function') window.Router.refresh();
   });
-  window.Modal.toast('已添加');
 }
 
 /* ---------- 辅助：处理勾选切换 ---------- */
 function toggleTodo(store, id, done) {
-  store.dispatch({
-    type: 'UPDATE_TODO',
-    payload: { id: id, done: done }
-  });
+  if (store && typeof store.dispatch === 'function') {
+    store.dispatch({
+      type: 'UPDATE_TODO',
+      payload: { id: id, done: done }
+    });
+  }
+  if (window.Router && typeof window.Router.refresh === 'function') window.Router.refresh();
+}
+
+/* ---------- 渲染后绑定事件 ---------- */
+function init(container, store) {
+  if (!container) return;
+  var addBtn = container.querySelector('[data-todo-add]');
+  if (addBtn) {
+    addBtn.addEventListener('click', function () {
+      promptAddTodo(store);
+    });
+  }
 }
 
 /* ---------- 主渲染函数 ---------- */
@@ -170,6 +183,7 @@ function renderTodo(state, store) {
 window.TodoView = {
   registerRoutes: registerRoutes,
   render: renderTodo,
+  init: init,
   _toggleTodo: toggleTodo,
   _promptAddTodo: promptAddTodo
 };

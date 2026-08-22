@@ -58,7 +58,7 @@ function saveTherapist(store, formEl) {
       payload: payload
     });
   }
-  window.Modal.toast('已保存');
+  window.Toast.info('已保存');
 }
 
 /* ---------- 辅助：构建数据管理区块 ---------- */
@@ -87,18 +87,18 @@ function buildDataManagement(store) {
 /* ---------- 辅助：处理导出 ---------- */
 function handleExport() {
   if (!window.DataIO || typeof window.DataIO.export !== 'function') {
-    window.Modal.toast('导出功能不可用');
+    window.Toast.info('导出功能不可用');
     return;
   }
   try {
     const result = window.DataIO.export();
     if (result !== false) {
-      window.Modal.toast('导出成功');
+      window.Toast.info('导出成功');
     } else {
-      window.Modal.toast('导出失败');
+      window.Toast.info('导出失败');
     }
   } catch (e) {
-    window.Modal.toast('导出异常：' + (e && e.message ? e.message : ''));
+    window.Toast.info('导出异常：' + (e && e.message ? e.message : ''));
   }
 }
 
@@ -110,24 +110,21 @@ function handleImportClick() {
 
 function handleImportFile(file) {
   if (!window.DataIO || typeof window.DataIO.import !== 'function') {
-    window.Modal.toast('导入功能不可用');
+    window.Toast.error('导入功能不可用');
     return;
   }
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    try {
-      const result = window.DataIO.import(e.target.result);
-      if (result !== false) {
-        window.Modal.toast('导入成功');
-      } else {
-        window.Modal.toast('导入失败');
-      }
-    } catch (err) {
-      window.Modal.toast('导入异常：' + (err && err.message ? err.message : ''));
+  window.DataIO.import(file).then(function (data) {
+    if (!data) { window.Toast.error('导入失败'); return; }
+    if (window.Store && typeof window.Store.dispatch === 'function') {
+      window.Store.dispatch({ type: 'HYDRATE', payload: data });
     }
-  };
-  reader.readAsText(file);
+    window.Toast.success('导入成功');
+    if (window.Router && typeof window.Router.refresh === 'function') window.Router.refresh();
+  }).catch(function (err) {
+    window.Toast.error('导入失败：' + (err && err.message ? err.message : '未知错误'));
+    // 导入后回到首页，避免停留在设置页但显示的是导入无效数据
+  });
 }
 
 /* ---------- 辅助：处理重置 ---------- */
@@ -135,18 +132,18 @@ function handleReset() {
   window.Modal.confirm('重置确认', '重置将清除所有本地数据，确定要继续吗？', function (ok) {
     if (!ok) return;
     if (!window.DataIO || typeof window.DataIO.reset !== 'function') {
-      window.Modal.toast('重置功能不可用');
+      window.Toast.info('重置功能不可用');
       return;
     }
     try {
       const result = window.DataIO.reset();
       if (result !== false) {
-        window.Modal.toast('已重置');
+        window.Toast.info('已重置');
       } else {
-        window.Modal.toast('重置失败');
+        window.Toast.info('重置失败');
       }
     } catch (e) {
-      window.Modal.toast('重置异常：' + (e && e.message ? e.message : ''));
+      window.Toast.info('重置异常：' + (e && e.message ? e.message : ''));
     }
   });
 }
@@ -154,27 +151,31 @@ function handleReset() {
 /* ---------- 辅助：处理备份 ---------- */
 function handleBackup() {
   if (!window.DataIO || typeof window.DataIO.backup !== 'function') {
-    window.Modal.toast('备份功能不可用');
+    window.Toast.info('备份功能不可用');
     return;
   }
   try {
     const result = window.DataIO.backup();
     if (result !== false) {
-      window.Modal.toast('备份成功');
+      window.Toast.info('备份成功');
     } else {
-      window.Modal.toast('备份失败');
+      window.Toast.info('备份失败');
     }
   } catch (e) {
-    window.Modal.toast('备份异常：' + (e && e.message ? e.message : ''));
+    window.Toast.info('备份异常：' + (e && e.message ? e.message : ''));
   }
 }
 
 /* ---------- 辅助：构建存储状态 ---------- */
-function buildStorageStatus(state) {
-  const storage = (state && state.storage) || {};
-  const usedKB = storage.usedKB || 0;
-  const totalKB = storage.totalKB || 0;
-  const freeKB = totalKB > 0 ? Math.max(totalKB - usedKB, 0) : 0;
+function buildStorageStatus() {
+  let storage = { available: false, usedBytes: 0 };
+  if (window.RehabStorage && typeof window.RehabStorage.getInfo === 'function') {
+    try { storage = window.RehabStorage.getInfo(); } catch (e) { storage = { available: false, usedBytes: 0 }; }
+  }
+  const totalBytes = 5 * 1024 * 1024;
+  const usedKB = storage.usedBytes ? Math.round(storage.usedBytes / 1024) : 0;
+  const totalKB = Math.round(totalBytes / 1024);
+  const freeKB = Math.max(totalKB - usedKB, 0);
   const usedPct = totalKB > 0 ? Math.round((usedKB / totalKB) * 100) : 0;
 
   const usedText = usedKB >= 1024 ? (usedKB / 1024).toFixed(2) + ' MB' : usedKB + ' KB';
@@ -222,15 +223,49 @@ function renderSettings(state, store) {
       '</div>' +
       buildTherapistCard(state, store) +
       buildDataManagement(store) +
-      buildStorageStatus(state) +
+      buildStorageStatus() +
       buildAbout() +
     '</div>';
+}
+
+/* ---------- 渲染后绑定事件 ---------- */
+function init(container, store) {
+  if (!container) return;
+
+  var saveBtn = container.querySelector('#therapist-save');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', function () {
+      saveTherapist(store, container);
+    });
+  }
+
+  var exportBtn = container.querySelector('#data-export');
+  if (exportBtn) exportBtn.addEventListener('click', handleExport);
+
+  var importBtn = container.querySelector('#data-import');
+  if (importBtn) importBtn.addEventListener('click', handleImportClick);
+
+  var resetBtn = container.querySelector('#data-reset');
+  if (resetBtn) resetBtn.addEventListener('click', handleReset);
+
+  var backupBtn = container.querySelector('#data-backup');
+  if (backupBtn) backupBtn.addEventListener('click', handleBackup);
+
+  var fileInput = container.querySelector('#data-import-file');
+  if (fileInput) {
+    fileInput.addEventListener('change', function (e) {
+      var f = e.target.files && e.target.files[0];
+      if (f) handleImportFile(f);
+      e.target.value = '';
+    });
+  }
 }
 
 // 暴露到全局
 window.SettingsView = {
   registerRoutes: registerRoutes,
   render: renderSettings,
+  init: init,
   _saveTherapist: saveTherapist,
   _handlers: {
     export: handleExport,
