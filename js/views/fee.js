@@ -15,18 +15,10 @@ function registerRoutes(router, store) {
   });
 }
 
-/* ---------- 内存中的默认收费项目数据 ---------- */
-let feeItems = [
-  { id: 'fee_1', name: '首次评估', price: 120, unit: '次', category: '评估' },
-  { id: 'fee_2', name: '复诊评估', price: 80, unit: '次', category: '评估' },
-  { id: 'fee_3', name: '针灸治疗', price: 60, unit: '次', category: '治疗' },
-  { id: 'fee_4', name: '推拿治疗', price: 80, unit: '次', category: '治疗' },
-  { id: 'fee_5', name: '一个疗程治疗包', price: 600, unit: '疗程', category: '治疗' },
-  { id: 'fee_6', name: 'X 光检查', price: 150, unit: '次', category: '检查' },
-  { id: 'fee_7', name: '血液检查', price: 200, unit: '次', category: '检查' },
-  { id: 'fee_8', name: '膏药耗材', price: 30, unit: '包', category: '耗材' },
-  { id: 'fee_9', name: '其他服务', price: 50, unit: '次', category: '其他' }
-];
+/* ---------- 辅助：从 state 获取列表 ---------- */
+function getFeeItems(state) {
+  return (state && state.feeItems) || [];
+}
 
 /* ---------- 分类定义 ---------- */
 const FEE_CATEGORIES = [
@@ -46,14 +38,6 @@ const CATEGORY_COLORS = {
   '耗材': '#d9804a',
   '其他': '#6b7280'
 };
-
-/* ---------- 辅助：从 state 或内存中获取列表 ---------- */
-function getFeeItems(state) {
-  if (state && state.feeItems && state.feeItems.length) {
-    return state.feeItems;
-  }
-  return feeItems;
-}
 
 /* ---------- 辅助：构建分类筛选标签 ---------- */
 function buildFilterTabs() {
@@ -148,37 +132,30 @@ function buildStats(state) {
 
 /* ---------- 辅助：处理新增项目 ---------- */
 function promptAddFee(store) {
-  const result = window.Modal.prompt('新增收费项目', '请填写项目信息（格式：名称|价格|单位|分类）：', '例如：中药治疗|50|次|治疗');
-  if (!result) return;
-  const text = (result.text || '').trim();
-  if (!text) {
-    window.Modal.toast('内容不能为空');
-    return;
-  }
-  const parts = text.split('|').map(function (s) { return s.trim(); });
-  if (parts.length < 2) {
-    window.Modal.toast('格式错误，请填写至少名称和价格');
-    return;
-  }
-  const item = {
-    id: 'fee_' + Date.now(),
-    name: parts[0],
-    price: Number(parts[1]) || 0,
-    unit: parts[2] || '次',
-    category: parts[3] || '其他'
-  };
-
-  if (store && typeof store.dispatch === 'function') {
-    store.dispatch({
-      type: 'ADD_FEE_ITEM',
-      payload: item
-    });
-  }
-  feeItems.push(item);
-  window.Modal.toast('已添加');
-  if (window.Router && typeof window.Router.refresh === 'function') {
-    window.Router.refresh();
-  }
+  window.Modal.prompt('新增收费项目', '格式：名称|价格|单位|分类（分类可为 评估/治疗/检查/耗材/其他）', '例如：中药治疗|50|次|治疗', function (text) {
+    text = (text || '').trim();
+    if (!text) {
+      window.Toast.warn('内容不能为空');
+      return;
+    }
+    const parts = text.split('|').map(function (s) { return s.trim(); });
+    if (parts.length < 2) {
+      window.Toast.warn('格式错误，请填写至少名称和价格');
+      return;
+    }
+    const item = {
+      id: 'fee_' + Date.now(),
+      name: parts[0],
+      price: Number(parts[1]) || 0,
+      unit: parts[2] || '次',
+      category: parts[3] || '其他'
+    };
+    if (store && typeof store.dispatch === 'function') {
+      store.dispatch({ type: 'ADD_FEE_ITEM', payload: item });
+    }
+    window.Toast.success('已添加');
+    if (window.Router && typeof window.Router.refresh === 'function') window.Router.refresh();
+  });
 }
 
 /* ---------- 辅助：处理删除项目 ---------- */
@@ -186,16 +163,10 @@ function deleteFee(store, id) {
   window.Modal.confirm('删除确认', '确定要删除该收费项目吗？', function (ok) {
     if (!ok) return;
     if (store && typeof store.dispatch === 'function') {
-      store.dispatch({
-        type: 'DELETE_FEE_ITEM',
-        payload: { id: id }
-      });
+      store.dispatch({ type: 'DELETE_FEE_ITEM', payload: { id: id } });
     }
-    feeItems = feeItems.filter(function (it) { return it.id !== id; });
-    window.Modal.toast('已删除');
-    if (window.Router && typeof window.Router.refresh === 'function') {
-      window.Router.refresh();
-    }
+    window.Toast.success('已删除');
+    if (window.Router && typeof window.Router.refresh === 'function') window.Router.refresh();
   });
 }
 
@@ -207,7 +178,7 @@ function renderFee(state, store) {
     '<div class="fee-view">' +
       '<div class="page-header-bar">' +
         '<div class="page-header-title">收费项目</div>' +
-        '<button class="btn-primary fee-add-btn">+ 新增项目</button>' +
+        '<button class="btn-primary fee-add-btn" data-fee-add>+ 新增项目</button>' +
       '</div>' +
       buildStats(state) +
       buildFilterTabs() +
@@ -215,10 +186,52 @@ function renderFee(state, store) {
     '</div>';
 }
 
+/* ---------- 渲染后绑定事件 ---------- */
+function init(container, store) {
+  if (!container) return;
+
+  var addBtn = container.querySelector('[data-fee-add]');
+  if (addBtn) {
+    addBtn.addEventListener('click', function () { promptAddFee(store); });
+  }
+
+  var deleteBtns = container.querySelectorAll('.fee-delete');
+  for (var i = 0; i < deleteBtns.length; i++) {
+    (function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var id = btn.getAttribute('data-fee-id');
+        if (id) deleteFee(store, id);
+      });
+    })(deleteBtns[i]);
+  }
+
+  // 分类过滤
+  var filterTabs = container.querySelectorAll('.filter-tab');
+  for (var j = 0; j < filterTabs.length; j++) {
+    (function (tab) {
+      tab.addEventListener('click', function () {
+        var cat = tab.getAttribute('data-filter') || 'all';
+        var cards = container.querySelectorAll('.fee-card');
+        for (var k = 0; k < cards.length; k++) {
+          var c = cards[k].getAttribute('data-category');
+          cards[k].style.display = (cat === 'all' || c === cat) ? '' : 'none';
+        }
+        for (var m = 0; m < filterTabs.length; m++) {
+          filterTabs[m].classList.remove('active');
+        }
+        tab.classList.add('active');
+      });
+    })(filterTabs[j]);
+  }
+}
+
 // 暴露到全局
 window.FeeView = {
   registerRoutes: registerRoutes,
   render: renderFee,
+  init: init,
   _add: promptAddFee,
   _delete: deleteFee
 };

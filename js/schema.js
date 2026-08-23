@@ -44,6 +44,15 @@ const VALIDATORS = {
     if (!a.patientId) errors.push('appointment.patientId 必填');
     if (!a.time || !a.date) errors.push('appointment.time 和 date 必填');
     return errors;
+  },
+  feeItem: function (f) {
+    const errors = [];
+    if (!f.id || typeof f.id !== 'string') errors.push('feeItem.id 必填');
+    if (!f.name || typeof f.name !== 'string') errors.push('feeItem.name 必填');
+    if (typeof f.price !== 'number' || isNaN(f.price) || f.price < 0) errors.push('feeItem.price 必须为非负数字');
+    if (!f.unit || typeof f.unit !== 'string') errors.push('feeItem.unit 必填');
+    if (!f.category || typeof f.category !== 'string') errors.push('feeItem.category 必填');
+    return errors;
   }
 };
 
@@ -66,7 +75,8 @@ function validateData(data) {
     ['appointments', 'array'],
     ['checkins', 'array'],
     ['therapist', 'object'],
-    ['stats', 'object']
+    ['stats', 'object'],
+    ['feeItems', 'array']
   ];
   checks.forEach(function ([key, expectedType]) {
     if (data[key] == null) {
@@ -103,7 +113,7 @@ function repairData(data) {
   if (!data.stats) {
     data.stats = { todayAppt: 0, todayDone: 0, todayRecords: 0, totalPatients: 0, pending: 0, todos: 0 };
   }
-  ['patients', 'records', 'todos', 'appointments', 'checkins'].forEach(function (key) {
+  ['patients', 'records', 'todos', 'appointments', 'checkins', 'feeItems'].forEach(function (key) {
     if (!Array.isArray(data[key])) data[key] = [];
   });
   return data;

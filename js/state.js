@@ -179,6 +179,24 @@ function createGenericReducers(store) {
     });
   });
 
+  store.addReducer('ADD_FEE_ITEM', function (state, payload) {
+    if (!payload || !payload.id) return state;
+    if (window.Schema && window.Schema.validateRecord(payload, 'feeItem').length > 0) {
+      console.warn('[Store] ADD_FEE_ITEM 校验失败');
+      return state;
+    }
+    return Object.assign({}, state, {
+      feeItems: (state.feeItems || []).concat([payload])
+    });
+  });
+
+  store.addReducer('DELETE_FEE_ITEM', function (state, payload) {
+    if (!payload || !payload.id) return state;
+    return Object.assign({}, state, {
+      feeItems: (state.feeItems || []).filter(function (f) { return f.id !== payload.id; })
+    });
+  });
+
   store.addReducer('REMOVE_APPOINTMENT', function (state, payload) {
     if (!payload) return state;
     return Object.assign({}, state, {

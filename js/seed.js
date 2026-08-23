@@ -190,6 +190,18 @@ const SEED_DATA = {
     { id: 'r14', patientId: 'p-shoulder', type: 'exam', title: 'Neer 撞击试验', summary: '阳性 · 肩关节特殊检查', date: '1周前', time: '10:00', createdAt: Date.now() - 7 * 86400000 }
   ],
 
+  feeItems: [
+    { id: 'fee_1', name: '首次评估', price: 120, unit: '次', category: '评估' },
+    { id: 'fee_2', name: '复诊评估', price: 80, unit: '次', category: '评估' },
+    { id: 'fee_3', name: '针灸治疗', price: 60, unit: '次', category: '治疗' },
+    { id: 'fee_4', name: '推拿治疗', price: 80, unit: '次', category: '治疗' },
+    { id: 'fee_5', name: '一个疗程治疗包', price: 600, unit: '疗程', category: '治疗' },
+    { id: 'fee_6', name: 'X 光检查', price: 150, unit: '次', category: '检查' },
+    { id: 'fee_7', name: '血液检查', price: 200, unit: '次', category: '检查' },
+    { id: 'fee_8', name: '膏药耗材', price: 30, unit: '包', category: '耗材' },
+    { id: 'fee_9', name: '其他服务', price: 50, unit: '次', category: '其他' }
+  ],
+
   scaleLibrary: [
     { key: 'VAS', name: 'VAS疼痛评分', category: '疼痛评估', ic: 'm1' },
     { key: 'NRS', name: 'NRS数字评分', category: '疼痛评估', ic: 'm1' },

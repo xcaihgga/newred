@@ -102,11 +102,84 @@ function buildApptTimeline(state) {
 function buildActionBar() {
   return '' +
     '<div class="action-bar">' +
-      '<button class="btn btn-primary" id="btnAddAppt" onclick="window.Toast.info(\'新增预约功能开发中\')">' +
+      '<button class="btn btn-primary" id="btnAddAppt" data-appt-add>' +
         window.getIcon('plus') +
         '<span>新增预约</span>' +
       '</button>' +
     '</div>';
+}
+
+/* ---------- 辅助：预约类型选项 ---------- */
+const APPT_TYPES = ['评估', '检查', '量表', '治疗', '影像'];
+
+/* ---------- 辅助：处理新增预约 ---------- */
+function promptAddAppt(store) {
+  if (!store) return;
+  const patients = store.getState().patients || [];
+  const options = patients.map(function (p) {
+    return '<option value="' + window.Esc.escAttr(p.id) + '">' + window.Esc.esc(p.name) + '</option>';
+  }).join('');
+
+  const form =
+    '<div class="appt-form">' +
+      '<div class="form-row">' +
+        '<label class="form-label">患者</label>' +
+        '<select class="form-input" data-appt-patient>' + options + '</select>' +
+      '</div>' +
+      '<div class="form-row">' +
+        '<label class="form-label">时间</label>' +
+        '<input type="time" class="form-input" data-appt-time value="09:00">' +
+      '</div>' +
+      '<div class="form-row">' +
+        '<label class="form-label">类型</label>' +
+        '<select class="form-input" data-appt-type>' +
+          APPT_TYPES.map(function (t) { return '<option value="' + window.Esc.escAttr(t) + '">' + window.Esc.esc(t) + '</option>'; }).join('') +
+        '</select>' +
+      '</div>' +
+      '<div class="form-row">' +
+        '<label class="form-label">备注</label>' +
+        '<input type="text" class="form-input" data-appt-note placeholder="如：腰椎·首评">' +
+      '</div>' +
+    '</div>';
+
+  window.Modal.open({
+    title: '新增预约',
+    content: form,
+    confirmText: '保存',
+    onConfirm: function (dialog) {
+      const patientId = dialog.querySelector('[data-appt-patient]').value;
+      const time = dialog.querySelector('[data-appt-time]').value;
+      const type = dialog.querySelector('[data-appt-type]').value;
+      const note = dialog.querySelector('[data-appt-note]').value;
+      if (!patientId || !time) {
+        window.Toast.warn('请选择患者并填写时间');
+        return false;
+      }
+      store.dispatch({
+        type: 'ADD_APPOINTMENT',
+        payload: {
+          id: 'a' + Date.now(),
+          patientId: patientId,
+          time: time,
+          date: 'today',
+          type: type,
+          note: note,
+          color: getTypeColor(type)
+        }
+      });
+      window.Toast.success('已新增预约');
+      if (window.Router && typeof window.Router.refresh === 'function') window.Router.refresh();
+    }
+  });
+}
+
+/* ---------- 渲染后绑定事件 ---------- */
+function init(container, store) {
+  if (!container) return;
+  var addBtn = container.querySelector('[data-appt-add]');
+  if (addBtn) {
+    addBtn.addEventListener('click', function () { promptAddAppt(store); });
+  }
 }
 
 /* ---------- 主渲染函数 ---------- */
@@ -124,5 +197,7 @@ function renderSchedule(state) {
 // 暴露到全局
 window.ScheduleView = {
   registerRoutes: registerRoutes,
-  render: renderSchedule
+  render: renderSchedule,
+  init: init,
+  _addAppt: promptAddAppt
 };})();
