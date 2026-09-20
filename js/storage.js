@@ -11,6 +11,11 @@ const STORAGE_KEY = 'rehab_workbench_data';
 const META_KEY = 'rehab_workbench_meta';
 const BACKUP_KEY = 'rehab_workbench_backup';
 const MAX_STORAGE_SIZE = 4 * 1024 * 1024;
+const BACKUP_INTERVAL = 60 * 60 * 1000; // 滚动备份间隔：1 小时
+
+// 最近一次 load() 的结果状态：
+// ok | empty(无数据) | recovered(已从备份恢复) | corrupt(损坏且无备份) | unavailable
+let lastLoadStatus = 'unknown';
 
 function isAvailable() {
   try {
@@ -46,11 +51,15 @@ function setMeta(version) {
 function load() {
   if (!isAvailable()) {
     console.warn('[Storage] localStorage 不可用，将使用内存数据');
+    lastLoadStatus = 'unavailable';
     return null;
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
+    if (!raw) {
+      lastLoadStatus = 'empty';
+      return null;
+    }
     let data = JSON.parse(raw);
     const meta = getMeta();
     if (meta.version < window.Schema.DB_VERSION) {
@@ -65,10 +74,47 @@ function load() {
       data = window.Schema.repairData(data);
       save(data);
     }
+    lastLoadStatus = 'ok';
     return data;
   } catch (e) {
     console.error('[Storage] 读取数据失败:', e);
-    return loadBackup() || null;
+    const bk = loadBackup();
+    if (bk) {
+      lastLoadStatus = 'recovered';
+      return bk;
+    }
+    lastLoadStatus = 'corrupt';
+    return null;
+  }
+}
+
+function getLastLoadStatus() {
+  return lastLoadStatus;
+}
+
+/* ---------- 滚动备份：写新数据前，先把当前完好数据写入备份 ---------- */
+function maybeBackupExisting() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    // 备份有效前提：当前数据能正常解析
+    const current = JSON.parse(raw);
+    const lastBk = localStorage.getItem(BACKUP_KEY);
+    let lastAt = 0;
+    if (lastBk) {
+      try {
+        const b = JSON.parse(lastBk);
+        lastAt = b && b.createdAt ? b.createdAt : 0;
+      } catch (e) { /* 备份本身损坏则重新写 */ }
+    }
+    if (Date.now() - lastAt < BACKUP_INTERVAL) return;
+    localStorage.setItem(BACKUP_KEY, JSON.stringify({
+      data: current,
+      createdAt: Date.now(),
+      version: current.version || window.Schema.DB_VERSION
+    }));
+  } catch (e) {
+    console.warn('[Storage] 滚动备份失败:', e);
   }
 }
 
@@ -78,6 +124,7 @@ function save(data) {
     return false;
   }
   try {
+    maybeBackupExisting();
     const json = JSON.stringify(data);
     const size = new Blob([json]).size;
     if (size > MAX_STORAGE_SIZE) {
@@ -203,6 +250,26 @@ function getStorageInfo() {
   };
 }
 
+/* ---------- 导出原始数据（用于数据损坏时抢救） ---------- */
+function exportRaw() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY) || '';
+    const blob = new Blob([raw], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'rehab-workbench-raw-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return true;
+  } catch (e) {
+    console.error('[Storage] 导出原始数据失败:', e);
+    return false;
+  }
+}
+
 window.RehabStorage = {
   isAvailable: isAvailable,
   load: load,
@@ -211,7 +278,9 @@ window.RehabStorage = {
   loadBackup: loadBackup,
   exportData: exportData,
   importData: importData,
+  exportRaw: exportRaw,
   clearAll: clearAll,
-  getInfo: getStorageInfo
+  getInfo: getStorageInfo,
+  getLastLoadStatus: getLastLoadStatus
 };
 })();

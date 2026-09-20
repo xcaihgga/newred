@@ -4133,3 +4133,108 @@ svg {
   width: 18px;
   height: 18px;
 }
+
+
+/* ============ 示例患者模板 ============ */
+.tpl-panel {
+  margin-bottom: 16px;
+}
+
+.tpl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.tpl-item {
+  position: relative;
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  padding: 12px;
+  cursor: pointer;
+  background: var(--c-surface);
+  transition: all var(--dur-fast);
+}
+
+.tpl-item:hover,
+.tpl-item:focus-visible {
+  border-color: var(--c-accent);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.tpl-item:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.tpl-name {
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
+  color: var(--c-text);
+  padding-right: 44px;
+}
+
+.tpl-desc {
+  font-size: var(--fs-2xs);
+  color: var(--c-text-3);
+  margin-top: 4px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tpl-tag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  font-weight: var(--fw-semibold);
+}
+
+.tpl-tag.tag-msk {
+  background: #bee3f8;
+  color: #2c5282;
+}
+
+.tpl-tag.tag-neuro {
+  background: #fbd38d;
+  color: #c05621;
+}
+
+.patient-card.hl-new {
+  outline: 3px solid var(--c-accent);
+  outline-offset: 2px;
+  border-radius: var(--r-md);
+}
+
+/* 新增患者表单 */
+.tpl-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tpl-form-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tpl-form-label {
+  width: 44px;
+  flex-shrink: 0;
+  font-size: var(--fs-sm);
+  color: var(--c-text-2);
+  font-weight: var(--fw-medium);
+}
+
+.tpl-form-row .modal-input {
+  flex: 1;
+  min-width: 0;
+}

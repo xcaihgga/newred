@@ -45,14 +45,21 @@ function bootstrap() {
   console.log('[Bootstrap] window.RehabStorage.isAvailable:', window.RehabStorage ? typeof window.RehabStorage.isAvailable : 'N/A');
 
   let data = null;
-  let fromSeed = false;
+  let loadStatus = 'unknown';
 
   try {
     if (window.RehabStorage && typeof window.RehabStorage.isAvailable === 'function' && window.RehabStorage.isAvailable()) {
       data = window.RehabStorage.load();
+      loadStatus = window.RehabStorage.getLastLoadStatus ? window.RehabStorage.getLastLoadStatus() : 'unknown';
     }
   } catch (e) {
     console.warn('[Bootstrap] Storage.load 失败:', e);
+  }
+
+  // 数据损坏且无备份可恢复 → 不要静默覆盖，交给用户处理
+  if (!data && loadStatus === 'corrupt') {
+    renderCorruptState();
+    return;
   }
 
   if (!data && window.Seed) {
@@ -65,7 +72,7 @@ function bootstrap() {
     } catch (e) {
       console.warn('[Bootstrap] Storage.save 失败:', e);
     }
-    fromSeed = true;
+    loadStatus = 'empty';
   }
 
   if (!data) {
@@ -77,7 +84,7 @@ function bootstrap() {
     patients: data.patients ? data.patients.length : 0,
     records: data.records ? data.records.length : 0,
     todos: data.todos ? data.todos.length : 0,
-    fromSeed: fromSeed
+    loadStatus: loadStatus
   });
 
   if (window.Schema) {
@@ -89,6 +96,15 @@ function bootstrap() {
         window.RehabStorage.save(data);
       }
     }
+  }
+
+  // 启动时写一次"最后完好快照"，补上自动恢复链
+  try {
+    if (window.RehabStorage && typeof window.RehabStorage.backup === 'function') {
+      window.RehabStorage.backup(data);
+    }
+  } catch (e) {
+    console.warn('[Bootstrap] 启动备份失败:', e);
   }
 
   const store = window.createStore(data);
@@ -133,6 +149,51 @@ function bootstrap() {
   });
 
   console.log('[Bootstrap] 启动完成 ✓');
+}
+
+/* ---------- 数据损坏时的兜底界面（不覆盖原数据） ---------- */
+function renderCorruptState() {
+  const container = document.getElementById('view');
+  if (!container) {
+    alert('本地数据文件损坏，无法读取。请打开浏览器开发者工具导出 localStorage 中的原始数据。');
+    return;
+  }
+  container.innerHTML = '' +
+    '<div class="error-state">' +
+      '<div class="error-title">😰 本地数据文件损坏，无法读取</div>' +
+      '<div class="error-desc">原始数据没有被删除，请先导出备份再处理。</div>' +
+      '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px">' +
+        '<button class="btn btn-primary" id="btnExportRaw">下载原始数据文件</button>' +
+        '<button class="btn" id="btnResetData">清除并重新开始</button>' +
+      '</div>' +
+    '</div>';
+
+  const exportBtn = document.getElementById('btnExportRaw');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', function () {
+      if (window.RehabStorage && typeof window.RehabStorage.exportRaw === 'function') {
+        const ok = window.RehabStorage.exportRaw();
+        if (ok) window.alert('已下载原始数据文件，可尝试用文本编辑器修复后，在「设置→导入数据」中恢复。');
+      }
+    });
+  }
+  const resetBtn = document.getElementById('btnResetData');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', function () {
+      if (window.Modal && typeof window.Modal.confirm === 'function') {
+        window.Modal.confirm('清除并重新开始', '将删除本地损坏数据并恢复示例数据，此操作不可撤销。确认继续？', function () {
+          if (window.RehabStorage && typeof window.RehabStorage.clearAll === 'function') {
+            window.RehabStorage.clearAll();
+          }
+          window.location.reload();
+        });
+      } else {
+        window.RehabStorage.clearAll();
+        window.location.reload();
+      }
+    });
+  }
+  console.error('[Bootstrap] 数据损坏，等待用户处理');
 }
 
 function setupOfflineDetection() {

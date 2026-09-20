@@ -201,7 +201,8 @@ function callViewInit(path) {
       '/todo': window.TodoView,
       '/settings': window.SettingsView,
       '/fee': window.FeeView,
-      '/schedule': window.ScheduleView
+      '/schedule': window.ScheduleView,
+      '/patients': window.PatientsView
     };
     const view = map[path] || map[first];
     const container = document.getElementById('view');
